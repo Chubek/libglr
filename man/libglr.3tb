@@ -1,0 +1,151 @@
+.TH GLR 3tb "2024" "LibGLR 1.0.0" "TwinBooks Library"
+.SH NAME
+glr \- Generalized LR Parser Library
+
+.SH SYNOPSIS
+.B #include <glr/glr.h>
+.PP
+.BI "glr_grammar_t *glr_grammar_create( void );"
+.BI "void glr_grammar_destroy( glr_grammar_t *grammar );"
+.BI "int glr_grammar_add_symbol( glr_grammar_t *grammar, glr_symbol_type_t type, const char *name );"
+.BI "glr_symbol_t *glr_grammar_get_symbol( const glr_grammar_t *grammar, int id );"
+.BI "int glr_grammar_add_production( glr_grammar_t *grammar, int head_id, glr_symbol_t **body, size_t body_length );"
+.BI "int glr_grammar_set_start_symbol( glr_grammar_t *grammar, int symbol_id );"
+.BI "glr_parser_t *glr_parser_create( glr_grammar_t *grammar );"
+.BI "void glr_parser_destroy( glr_parser_t *parser );"
+.BI "glr_parse_result_t glr_parse( glr_parser_t *parser, const char *input, size_t length );"
+
+.SH DESCRIPTION
+.B LibGLR
+is a C library for implementing Generalized LR (GLR) parsers. It provides
+data structures and algorithms for:
+.IP \[bu] 4
+Grammar representation (symbols and productions)
+.IP \[bu] 4
+DAG-based stacks for efficient state management
+.IP \[bu] 4
+Forking mechanism for handling ambiguity
+.IP \[bu] 4
+Shared Parse Forest (SPPF) for compact ambiguity representation
+.IP \[bu] 4
+Reduction operations
+
+.SH GRAMMAR API
+.TP
+.B glr_grammar_t *glr_grammar_create( void )
+Create a new empty grammar. Returns NULL on failure.
+
+.TP
+.B void glr_grammar_destroy( glr_grammar_t *grammar )
+Destroy a grammar and free all associated memory.
+
+.TP
+.B int glr_grammar_add_symbol( glr_grammar_t *grammar, glr_symbol_type_t type, const char *name )
+Add a symbol to the grammar. Returns symbol ID (>= 0) on success, -1 on failure.
+
+.TP
+.B glr_symbol_t *glr_grammar_get_symbol( const glr_grammar_t *grammar, int id )
+Get a symbol by ID. Returns NULL if not found.
+
+.TP
+.B int glr_grammar_add_production( glr_grammar_t *grammar, int head_id, glr_symbol_t **body, size_t body_length )
+Add a production. Returns production ID (>= 0) on success, -1 on failure.
+
+.TP
+.B int glr_grammar_set_start_symbol( glr_grammar_t *grammar, int symbol_id )
+Set the start symbol. Returns 0 on success, -1 on failure.
+
+.SH PARSER API
+.TP
+.B glr_parser_t *glr_parser_create( glr_grammar_t *grammar )
+Create a new GLR parser for the given grammar.
+
+.TP
+.B void glr_parser_destroy( glr_parser_t *parser )
+Destroy a parser and free all resources.
+
+.TP
+.B glr_parse_result_t glr_parse( glr_parser_t *parser, const char *input, size_t length )
+Parse input string. Returns parse result with error code and forest.
+
+.SH STACK API
+.TP
+.B glr_stack_t *glr_stack_create( void )
+Create a new DAG-based stack.
+
+.TP
+.B glr_stack_t *glr_stack_fork( glr_stack_t *stack, size_t height )
+Fork the stack at specified height for ambiguity handling.
+
+.TP
+.B int glr_stack_push( glr_stack_t *stack, void *state )
+Push state onto stack.
+
+.TP
+.B void *glr_stack_pop( glr_stack_t *stack )
+Pop state from stack.
+
+.SH FOREST API
+.TP
+.B glr_forest_t *glr_forest_create( void )
+Create a new shared parse forest.
+
+.TP
+.B glr_forest_node_t *glr_forest_get_node( glr_forest_t *forest, glr_forest_node_type_t type, int symbol_id, size_t position )
+Get or create a node in the forest.
+
+.TP
+.B int glr_forest_add_child( glr_forest_node_t *parent, glr_forest_node_t *child )
+Add child to non-terminal node.
+
+.SH ERROR CODES
+.TP
+.B GLR_PARSE_SUCCESS
+Parsing completed successfully.
+.TP
+.B GLR_PARSE_ERROR_SYNTAX
+Syntax error in input.
+.TP
+.B GLR_PARSE_ERROR_MEMORY
+Memory allocation failed.
+.TP
+.B GLR_PARSE_ERROR_GRAMMAR
+Grammar is invalid.
+.TP
+.B GLR_PARSE_ERROR_UNRECOVERABLE
+Unrecoverable parse error.
+
+.SH EXAMPLE
+.nf
+.B #include <glr/glr.h>
+.PP
+.B // Create grammar
+.B glr_grammar_t *grammar = glr_grammar_create();
+.B int expr = glr_grammar_add_symbol(grammar, GLR_SYMBOL_NONTERMINAL, "expr");
+.B int num = glr_grammar_add_symbol(grammar, GLR_SYMBOL_TERMINAL, "NUMBER");
+.PP
+.B // Add production: expr -> NUMBER
+.B glr_symbol_t *body[] = { glr_grammar_get_symbol(grammar, num) };
+.B glr_grammar_add_production(grammar, expr, body, 1);
+.B glr_grammar_set_start_symbol(grammar, expr);
+.PP
+.B // Create and use parser
+.B glr_parser_t *parser = glr_parser_create(grammar);
+.B glr_parse_result_t result = glr_parse(parser, "123", 3);
+.B if (result.error == GLR_PARSE_SUCCESS) {
+.B     printf("Parse successful\\n");
+.B }
+.B glr_parser_destroy(parser);
+.B glr_grammar_destroy(grammar);
+.fi
+
+.SH SEE ALSO
+.BR cmake (1),
+.BR doxygen (1)
+
+.SH AUTHOR
+LibGLR is part of the TwinBooks project:
+"Software Language Tooling: a Vademecum" and "Compilonomikon".
+
+.SH COPYRIGHT
+This library is part of the TwinBooks project.
