@@ -1,6 +1,6 @@
 # LibGLR: Generalized LR Parser Library
 
-**Part of the TwinBooks Project, See PROJECT.md**
+This software is AI slop. Most of my work are not made with AI. [See for yourself](https://github.com/Chubek).
 
 LibGLR is a minimal C library for implementing Generalized LR (GLR) parsers. It provides facilities for:
 
