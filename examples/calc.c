@@ -53,6 +53,9 @@ typedef struct {
     token_t current;
 } lexer_t;
 
+/* Forward declaration */
+static void lexer_next(lexer_t *lexer);
+
 /**
  * @brief Initialize lexer with input string
  */

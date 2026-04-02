@@ -90,6 +90,19 @@ void glr_parser_destroy(glr_parser_t *parser);
 int glr_parser_reset(glr_parser_t *parser);
 
 /**
+ * @brief Parse input using the GLR algorithm
+ *
+ * Runs the full GLR parsing loop on the provided input buffer.
+ * The parser is reset before each invocation.
+ *
+ * @param parser Pointer to an initialized parser
+ * @param input  Input buffer to parse
+ * @param length Length of the input buffer in bytes
+ * @return A @ref glr_parse_result_t describing the outcome
+ */
+glr_parse_result_t glr_parse(glr_parser_t *parser, const char *input, size_t length);
+
+/**
  * @brief Set user data for the parser
  * 
  * @param parser Pointer to parser

@@ -10,6 +10,10 @@ static void handle_conflict(glr_parser_t *parser);
 static int initialize_parser(glr_parser_t *parser);
 
 glr_parser_t *glr_parser_create(glr_grammar_t *grammar) {
+    if (grammar == NULL) {
+        return NULL;
+    }
+
     glr_parser_t *parser = calloc(1, sizeof(glr_parser_t));
     if (parser == NULL) {
         return NULL;
