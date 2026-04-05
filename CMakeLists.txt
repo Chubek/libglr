@@ -70,22 +70,9 @@ if(BUILD_DOCUMENTATION)
     add_subdirectory(doc)
 endif()
 
-# Install scripts
-install(PROGRAMS
-    scripts/test-library.sh
-    scripts/compile.sh
-    scripts/install.sh
-    scripts/build-docs.sh
-    DESTINATION bin
-    PERMISSIONS OWNER_EXECUTE GROUP_EXECUTE WORLD_EXECUTE)
-install(FILES
-    scripts/extract-constructs.py
-    DESTINATION bin
-    PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
-
 # Install manpage
 if(BUILD_DOCUMENTATION)
-    install(FILES man/libglr.3tb
+    install(FILES man/libglr.3
         DESTINATION share/man/man3
     )
 endif()

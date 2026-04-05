@@ -1,13 +1,13 @@
 #ifndef GLR_GRAMMAR_H
 #define GLR_GRAMMAR_H
 
-#include <stddef.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 /**
  * @file grammar.h
  * @brief Grammar data structure for GLR parsers
- * 
+ *
  * This module provides the core grammar data structure used by LibGLR.
  * Grammars are represented as collections of productions, each consisting
  * of a non-terminal head and a sequence of symbols (terminals and/or
@@ -15,145 +15,156 @@
  */
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-/**
- * @typedef glr_symbol_type_t
- * @brief Symbol type enumeration
- * 
- * Indicates whether a symbol is a terminal or non-terminal.
- */
-typedef enum {
-    GLR_SYMBOL_TERMINAL,    ///< Terminal symbol
-    GLR_SYMBOL_NONTERMINAL  ///< Non-terminal symbol
-} glr_symbol_type_t;
+  /**
+   * @typedef glr_symbol_type_t
+   * @brief Symbol type enumeration
+   *
+   * Indicates whether a symbol is a terminal or non-terminal.
+   */
+  typedef enum
+  {
+    GLR_SYMBOL_TERMINAL,   ///< Terminal symbol
+    GLR_SYMBOL_NONTERMINAL ///< Non-terminal symbol
+  } glr_symbol_type_t;
 
-/**
- * @typedef glr_symbol_t
- * @brief A single symbol (terminal or non-terminal)
- * 
- * Symbols are the basic building blocks of grammar productions.
- */
-typedef struct {
-    glr_symbol_type_t type;   ///< Type of symbol
-    int id;                   ///< Unique identifier
-    char *name;               ///< Symbol name (e.g., "+", "expression")
-} glr_symbol_t;
+  /**
+   * @typedef glr_symbol_t
+   * @brief A single symbol (terminal or non-terminal)
+   *
+   * Symbols are the basic building blocks of grammar productions.
+   */
+  typedef struct
+  {
+    glr_symbol_type_t type; ///< Type of symbol
+    int id;                 ///< Unique identifier
+    char *name;             ///< Symbol name (e.g., "+", "expression")
+  } glr_symbol_t;
 
-/**
- * @typedef glr_production_t
- * @brief A single grammar production
- * 
- * A production consists of a head (non-terminal) and a body
- * (sequence of symbols on the right-hand side).
- */
-typedef struct {
-    int id;                       ///< Unique production identifier
-    glr_symbol_t *head;           ///< Head non-terminal
-    glr_symbol_t **body;          ///< Body symbols (array)
-    size_t body_length;           ///< Number of symbols in body
-    char *annotation;             ///< Optional production annotation
-} glr_production_t;
+  /**
+   * @typedef glr_production_t
+   * @brief A single grammar production
+   *
+   * A production consists of a head (non-terminal) and a body
+   * (sequence of symbols on the right-hand side).
+   */
+  typedef struct
+  {
+    int id;              ///< Unique production identifier
+    glr_symbol_t *head;  ///< Head non-terminal
+    glr_symbol_t **body; ///< Body symbols (array)
+    size_t body_length;  ///< Number of symbols in body
+    char *annotation;    ///< Optional production annotation
+  } glr_production_t;
 
-/**
- * @typedef glr_grammar_t
- * @brief Complete grammar representation
- * 
- * Contains all symbols and productions for a grammar,
- * along with the start symbol.
- */
-typedef struct {
-    glr_symbol_t **symbols;       ///< All symbols (terminals + non-terminals)
-    size_t symbol_count;          ///< Number of symbols
+  /**
+   * @typedef glr_grammar_t
+   * @brief Complete grammar representation
+   *
+   * Contains all symbols and productions for a grammar,
+   * along with the start symbol.
+   */
+  typedef struct
+  {
+    glr_symbol_t **symbols; ///< All symbols (terminals + non-terminals)
+    size_t symbol_count;    ///< Number of symbols
     glr_production_t **productions; ///< All productions
-    size_t production_count;      ///< Number of productions
-    glr_symbol_t *start_symbol;   ///< Grammar start symbol
-    char *name;                   ///< Grammar name
-} glr_grammar_t;
+    size_t production_count;        ///< Number of productions
+    glr_symbol_t *start_symbol;     ///< Grammar start symbol
+    char *name;                     ///< Grammar name
+  } glr_grammar_t;
 
-/**
- * @brief Create a new empty grammar
- * 
- * @return Pointer to new grammar, or NULL on failure
- */
-glr_grammar_t *glr_grammar_create(void);
+  /**
+   * @brief Create a new empty grammar
+   *
+   * @return Pointer to new grammar, or NULL on failure
+   */
+  glr_grammar_t *glr_grammar_create (void);
 
-/**
- * @brief Destroy a grammar and free all associated memory
- * 
- * @param grammar Pointer to grammar to destroy
- */
-void glr_grammar_destroy(glr_grammar_t *grammar);
+  /**
+   * @brief Destroy a grammar and free all associated memory
+   *
+   * @param grammar Pointer to grammar to destroy
+   */
+  void glr_grammar_destroy (glr_grammar_t *grammar);
 
-/**
- * @brief Add a symbol to the grammar
- * 
- * @param grammar Grammar to add symbol to
- * @param type Symbol type (terminal or non-terminal)
- * @param name Symbol name
- * @return Symbol ID (>= 0) on success, -1 on failure
- */
-int glr_grammar_add_symbol(glr_grammar_t *grammar, glr_symbol_type_t type, const char *name);
+  /**
+   * @brief Add a symbol to the grammar
+   *
+   * @param grammar Grammar to add symbol to
+   * @param type Symbol type (terminal or non-terminal)
+   * @param name Symbol name
+   * @return Symbol ID (>= 0) on success, -1 on failure
+   */
+  int glr_grammar_add_symbol (glr_grammar_t *grammar, glr_symbol_type_t type,
+                              const char *name);
 
-/**
- * @brief Get a symbol by ID
- * 
- * @param grammar Grammar to search
- * @param id Symbol ID
- * @return Pointer to symbol, or NULL if not found
- */
-glr_symbol_t *glr_grammar_get_symbol(const glr_grammar_t *grammar, int id);
+  /**
+   * @brief Get a symbol by ID
+   *
+   * @param grammar Grammar to search
+   * @param id Symbol ID
+   * @return Pointer to symbol, or NULL if not found
+   */
+  glr_symbol_t *glr_grammar_get_symbol (const glr_grammar_t *grammar, int id);
 
-/**
- * @brief Add a new production to the grammar
- * 
- * @param grammar Grammar to add production to
- * @param head_id ID of head non-terminal
- * @param body Symbols in production body (array)
- * @param body_length Number of symbols in body
- * @return Production ID (>= 0) on success, -1 on failure
- */
-int glr_grammar_add_production(glr_grammar_t *grammar, int head_id,
-                               glr_symbol_t **body, size_t body_length);
+  /**
+   * @brief Add a new production to the grammar
+   *
+   * @param grammar Grammar to add production to
+   * @param head_id ID of head non-terminal
+   * @param body Symbols in production body (array)
+   * @param body_length Number of symbols in body
+   * @return Production ID (>= 0) on success, -1 on failure
+   */
+  int glr_grammar_add_production (glr_grammar_t *grammar, int head_id,
+                                  glr_symbol_t **body, size_t body_length);
 
-/**
- * @brief Set the start symbol for the grammar
- * 
- * @param grammar Grammar to configure
- * @param symbol_id ID of start symbol
- * @return 0 on success, -1 on failure
- */
-int glr_grammar_set_start_symbol(glr_grammar_t *grammar, int symbol_id);
+  /**
+   * @brief Set the start symbol for the grammar
+   *
+   * @param grammar Grammar to configure
+   * @param symbol_id ID of start symbol
+   * @return 0 on success, -1 on failure
+   */
+  int glr_grammar_set_start_symbol (glr_grammar_t *grammar, int symbol_id);
 
-/**
- * @brief Get a production by ID
- * 
- * @param grammar Grammar to search
- * @param id Production ID
- * @return Pointer to production, or NULL if not found
- */
-glr_production_t *glr_grammar_get_production(const glr_grammar_t *grammar, int id);
+  /**
+   * @brief Get a production by ID
+   *
+   * @param grammar Grammar to search
+   * @param id Production ID
+   * @return Pointer to production, or NULL if not found
+   */
+  glr_production_t *glr_grammar_get_production (const glr_grammar_t *grammar,
+                                                int id);
 
-/**
- * @brief Check if a symbol is a terminal
- * 
- * @param symbol Pointer to symbol
- * @return true if terminal, false if non-terminal
- */
-static inline bool glr_symbol_is_terminal(glr_symbol_t *symbol) {
+  /**
+   * @brief Check if a symbol is a terminal
+   *
+   * @param symbol Pointer to symbol
+   * @return true if terminal, false if non-terminal
+   */
+  static inline bool
+  glr_symbol_is_terminal (glr_symbol_t *symbol)
+  {
     return symbol != NULL && symbol->type == GLR_SYMBOL_TERMINAL;
-}
+  }
 
-/**
- * @brief Check if a symbol is a non-terminal
- * 
- * @param symbol Pointer to symbol
- * @return true if non-terminal, false if terminal
- */
-static inline bool glr_symbol_is_nonterminal(glr_symbol_t *symbol) {
+  /**
+   * @brief Check if a symbol is a non-terminal
+   *
+   * @param symbol Pointer to symbol
+   * @return true if non-terminal, false if terminal
+   */
+  static inline bool
+  glr_symbol_is_nonterminal (glr_symbol_t *symbol)
+  {
     return symbol != NULL && symbol->type == GLR_SYMBOL_NONTERMINAL;
-}
+  }
 
 #ifdef __cplusplus
 }
