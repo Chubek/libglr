@@ -215,3 +215,6 @@ lcov.info
 ###########################
 third_party/*
 !third_party/.gitkeep
+
+# AGENTS
+AGENTS.md
