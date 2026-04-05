@@ -61,6 +61,7 @@ install(FILES
     include/glr/reduction.h
     include/glr/graph.h
     include/glr/parser.h
+    include/glr/disambiguate.h
     DESTINATION include/glr
 )
 
