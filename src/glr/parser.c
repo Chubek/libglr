@@ -30,6 +30,7 @@ glr_parser_create (glr_grammar_t *grammar)
   parser->forest = glr_forest_create ();
   parser->state_table = NULL;
   parser->state_table_size = 0;
+  parser->disambig_hooks = NULL;
   parser->input = NULL;
   parser->input_pos = 0;
   parser->input_length = 0;
@@ -56,6 +57,8 @@ glr_parser_destroy (glr_parser_t *parser)
   glr_forest_destroy (parser->forest);
 
   free (parser->state_table);
+
+  glr_parser_clear_disambiguators (parser);
 
   free (parser);
 }
@@ -155,6 +158,23 @@ handle_conflict (glr_parser_t *parser)
   if (parser == NULL)
     {
       return;
+    }
+
+  if (parser->disambig_hooks != NULL)
+    {
+      glr_disambig_context_t context = {
+        .parser = parser,
+        .grammar = parser->grammar,
+        .forest = parser->forest,
+        .parent = NULL,
+        .candidates = NULL,
+        .candidate_count = 0,
+        .lookahead_symbol_id = -1,
+        .start_position = parser->input_pos,
+        .end_position = parser->input_pos,
+        .user_data = parser->user_data,
+      };
+      (void)glr_parser_run_disambiguators (parser, &context, NULL);
     }
 }
 

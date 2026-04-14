@@ -9,6 +9,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 option(BUILD_TESTS "Build test suite" ON)
 option(BUILD_EXAMPLES "Build examples" ON)
 option(BUILD_DOCUMENTATION "Build documentation" ON)
+option(BUILD_DISAMBSTD "Build the standard disambiguation library" ON)
 
 # Library sources - only .c files in src
 set(GLR_SOURCES
@@ -19,6 +20,7 @@ set(GLR_SOURCES
     src/glr/reduction.c
     src/glr/graph.c
     src/glr/parser.c
+    src/glr/disambiguate.c
 )
 
 # Create library
@@ -61,6 +63,8 @@ install(FILES
     include/glr/reduction.h
     include/glr/graph.h
     include/glr/parser.h
+    include/glr/disambiguate.h
+    include/glr/disambiguate-hooks.h
     DESTINATION include/glr
 )
 
@@ -92,6 +96,10 @@ endif()
 # Examples
 if(BUILD_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+if(BUILD_DISAMBSTD)
+    add_subdirectory(disambstd)
 endif()
 
 # Generate package config file

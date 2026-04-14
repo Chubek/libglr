@@ -8,6 +8,10 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+typedef struct glr_parser glr_parser_t;
+
+#include <glr/disambiguate.h>
+
 /**
  * @file parser.h
  * @brief GLR parser core infrastructure
@@ -54,7 +58,7 @@ extern "C"
    * Contains all state needed for GLR parsing, including
    * multiple stacks for handling ambiguity.
    */
-  typedef struct
+  struct glr_parser
   {
     glr_grammar_t *grammar;  ///< Grammar being parsed
     glr_stack_t **stacks;    ///< Array of stacks (one per parse path)
@@ -63,12 +67,13 @@ extern "C"
     glr_forest_t *forest;    ///< Shared parse forest
     void **state_table;      ///< State transition table
     size_t state_table_size; ///< State table size
+    glr_disambig_hook_t *disambig_hooks; ///< Disambiguation hooks
     const char *input;       ///< Current input
     size_t input_pos;        ///< Current input position
     size_t input_length;     ///< Total input length
     glr_parse_error_t error; ///< Last error
     void *user_data;         ///< User data
-  } glr_parser_t;
+  };
 
   /**
    * @brief Create a new GLR parser

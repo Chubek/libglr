@@ -28,6 +28,7 @@
  */
 
 #include "forest.h"
+#include "disambiguate.h"
 #include "fork.h"
 #include "grammar.h"
 #include "graph.h"
