@@ -17,6 +17,19 @@
  * Shared Packed Parse Forest (SPPF) conflicts. The parser provides a set of
  * alternative candidates for a single ambiguous forest node, and registered
  * hooks may reject, score, or select a winner.
+ *
+ * @defgroup disambiguation_api Disambiguation API
+ * @brief Parser-integrated machinery for resolving SPPF ambiguity.
+ *
+ * The API is centered around a @ref glr_disambig_context_t that describes one
+ * ambiguous SPPF choice point and a chain of @ref glr_disambig_hook_t objects
+ * registered on a parser. Hooks can eliminate candidates, score them, or
+ * choose a final winner for precedence, associativity, semantic validation,
+ * dynamic programming, probability scoring, and related policies.
+ *
+ * @defgroup disambstd_api Standard Disambiguators
+ * @ingroup disambiguation_api
+ * @brief Factory helpers for the built-in disambiguation strategies.
  */
 
 #ifdef __cplusplus
@@ -120,30 +133,66 @@ extern "C"
     struct glr_disambig_hook *next;  ///< Linked-list successor
   } glr_disambig_hook_t;
 
+  /**
+   * @ingroup disambiguation_api
+   * @brief Create a generic disambiguation hook.
+   */
   glr_disambig_hook_t *glr_disambig_hook_create (
       const char *name, unsigned int priority, glr_disambig_fn fn,
       void *user_data, glr_disambig_destroy_fn destroy);
 
+  /**
+   * @ingroup disambiguation_api
+   * @brief Destroy one disambiguation hook.
+   */
   void glr_disambig_hook_destroy (glr_disambig_hook_t *hook);
 
+  /**
+   * @ingroup disambiguation_api
+   * @brief Register a disambiguator on a parser.
+   */
   int glr_parser_add_disambiguator (glr_parser_t *parser,
                                     glr_disambig_hook_t *hook);
 
+  /**
+   * @ingroup disambiguation_api
+   * @brief Remove and destroy all parser disambiguators.
+   */
   void glr_parser_clear_disambiguators (glr_parser_t *parser);
 
+  /**
+   * @ingroup disambiguation_api
+   * @brief Run parser disambiguators against one ambiguity context.
+   */
   glr_disambig_result_t glr_parser_run_disambiguators (
       glr_parser_t *parser, glr_disambig_context_t *context,
       size_t *winner_index);
 
+  /**
+   * @ingroup disambiguation_api
+   * @brief Count the candidates that have not been rejected.
+   */
   size_t glr_disambig_context_active_count (
       const glr_disambig_context_t *context);
 
+  /**
+   * @ingroup disambiguation_api
+   * @brief Return the last surviving candidate index, if unique.
+   */
   size_t glr_disambig_context_last_active (
       const glr_disambig_context_t *context);
 
+  /**
+   * @ingroup disambiguation_api
+   * @brief Reject a candidate in-place.
+   */
   int glr_disambig_context_reject_candidate (glr_disambig_context_t *context,
                                              size_t index);
 
+  /**
+   * @ingroup disambiguation_api
+   * @brief Select one candidate and reject the rest.
+   */
   int glr_disambig_context_select_candidate (glr_disambig_context_t *context,
                                              size_t index);
 
@@ -172,29 +221,53 @@ extern "C"
       const glr_disambig_context_t *context, const glr_forest_node_t *node,
       const glr_disambig_candidate_t *candidate, void *user_data);
 
+  /**
+   * @ingroup disambstd_api
+   * @brief Build a precedence-based disambiguator.
+   */
   glr_disambig_hook_t *glr_disambig_precedence_hook_create (
       const char *name, unsigned int priority,
       glr_disambig_int_resolver_fn resolver, void *user_data,
       glr_disambig_destroy_fn destroy);
 
+  /**
+   * @ingroup disambstd_api
+   * @brief Build an associativity-aware operator disambiguator.
+   */
   glr_disambig_hook_t *glr_disambig_associativity_hook_create (
       const char *name, unsigned int priority,
       glr_disambig_int_resolver_fn precedence_resolver,
       glr_disambig_assoc_resolver_fn associativity_resolver, void *user_data,
       glr_disambig_destroy_fn destroy);
 
+  /**
+   * @ingroup disambstd_api
+   * @brief Build a syntactic predicate disambiguator.
+   */
   glr_disambig_hook_t *glr_disambig_predicate_hook_create (
       const char *name, unsigned int priority, glr_disambig_predicate_fn fn,
       void *user_data, glr_disambig_destroy_fn destroy);
 
+  /**
+   * @ingroup disambstd_api
+   * @brief Build a semantic-constraint disambiguator.
+   */
   glr_disambig_hook_t *glr_disambig_semantic_hook_create (
       const char *name, unsigned int priority, glr_disambig_predicate_fn fn,
       void *user_data, glr_disambig_destroy_fn destroy);
 
+  /**
+   * @ingroup disambstd_api
+   * @brief Build a dynamic-programming disambiguator over forest cost.
+   */
   glr_disambig_hook_t *glr_disambig_dynamic_programming_hook_create (
       const char *name, unsigned int priority, glr_disambig_score_fn fn,
       void *user_data, glr_disambig_destroy_fn destroy);
 
+  /**
+   * @ingroup disambstd_api
+   * @brief Build a probability-scoring disambiguator.
+   */
   glr_disambig_hook_t *glr_disambig_probability_hook_create (
       const char *name, unsigned int priority, glr_disambig_score_fn fn,
       void *user_data, glr_disambig_destroy_fn destroy);

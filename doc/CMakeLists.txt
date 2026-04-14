@@ -33,6 +33,7 @@ if(DOXYGEN_FOUND)
     doxygen_add_docs(docs
         ALL
         ${CMAKE_CURRENT_SOURCE_DIR}/../include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../disambstd
         ${CMAKE_CURRENT_SOURCE_DIR}/../README.md
         COMMENT "Generating API documentation with Doxygen"
     )

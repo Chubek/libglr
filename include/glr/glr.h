@@ -12,6 +12,7 @@
  * - DAG-based stack implementation for efficient state management
  * - Forking mechanism for handling ambiguity
  * - SPPF (Shared Parse Forest) data structure
+ * - Disambiguation hooks and standard policies for SPPF selection
  * - Reduction operations for GLR parsing
  *
  * @section modules Library Modules
@@ -22,6 +23,7 @@
  * - @ref reduction.h - Reduction operations
  * - @ref graph.h - Graph operations for forests
  * - @ref parser.h - Parser core infrastructure
+ * - @ref disambiguation_api - Disambiguation API and standard strategies
  *
  * @note All public APIs are documented with Doxygen comments.
  *       The library uses the "3tb" manpage section (e.g., libglr.3tb).
