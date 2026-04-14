@@ -30,7 +30,7 @@ extern "C"
   } glr_forest_node_type_t;
 
   /**
-   * @typedef glr_forest_node_t
+   * @struct glr_forest_node_t
    * @brief A node in the SPPF
    *
    * Nodes represent either terminal symbols, non-terminal splits,
@@ -49,7 +49,7 @@ extern "C"
   } glr_forest_node_t;
 
   /**
-   * @typedef glr_forest_edge_t
+   * @struct glr_forest_edge_t
    * @brief An edge in the SPPF
    *
    * Edges connect nodes across different positions in the input.
@@ -63,7 +63,7 @@ extern "C"
   } glr_forest_edge_t;
 
   /**
-   * @typedef glr_forest_t
+   * @struct glr_forest_t
    * @brief Complete SPPF container
    *
    * Manages all nodes and edges in the shared parse forest.

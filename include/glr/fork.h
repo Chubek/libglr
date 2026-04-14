@@ -19,7 +19,7 @@ extern "C"
 #endif
 
   /**
-   * @typedef glr_fork_t
+   * @struct glr_fork_t
    * @brief A fork point in the stack DAG
    *
    * A fork represents a divergence point where multiple parse paths

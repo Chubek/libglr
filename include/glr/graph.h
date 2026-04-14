@@ -18,7 +18,7 @@ extern "C"
 #endif
 
   /**
-   * @typedef glr_graph_node_t
+   * @struct glr_graph_node_t
    * @brief A node in the SPPF graph
    *
    * Graph nodes represent points in the parse forest where
@@ -37,7 +37,7 @@ extern "C"
   } glr_graph_node_t;
 
   /**
-   * @typedef glr_graph_edge_t
+   * @struct glr_graph_edge_t
    * @brief An edge in the SPPF graph
    *
    * Edges connect nodes and represent derivation steps
@@ -52,7 +52,7 @@ extern "C"
   } glr_graph_edge_t;
 
   /**
-   * @typedef glr_graph_t
+   * @struct glr_graph_t
    * @brief Graph container
    *
    * Manages all nodes and edges in a graph.

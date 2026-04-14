@@ -73,13 +73,6 @@ if(BUILD_DOCUMENTATION)
     add_subdirectory(doc)
 endif()
 
-# Install manpage
-if(BUILD_DOCUMENTATION)
-    install(FILES man/libglr.3
-        DESTINATION share/man/man3
-    )
-endif()
-
 # Export targets
 install(EXPORT ${PROJECT_NAME}-exports
     FILE ${PROJECT_NAME}-config.cmake

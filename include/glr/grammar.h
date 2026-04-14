@@ -32,7 +32,7 @@ extern "C"
   } glr_symbol_type_t;
 
   /**
-   * @typedef glr_symbol_t
+   * @struct glr_symbol_t
    * @brief A single symbol (terminal or non-terminal)
    *
    * Symbols are the basic building blocks of grammar productions.
@@ -45,7 +45,7 @@ extern "C"
   } glr_symbol_t;
 
   /**
-   * @typedef glr_production_t
+   * @struct glr_production_t
    * @brief A single grammar production
    *
    * A production consists of a head (non-terminal) and a body
@@ -61,7 +61,7 @@ extern "C"
   } glr_production_t;
 
   /**
-   * @typedef glr_grammar_t
+   * @struct glr_grammar_t
    * @brief Complete grammar representation
    *
    * Contains all symbols and productions for a grammar,

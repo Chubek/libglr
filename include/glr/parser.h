@@ -40,7 +40,7 @@ extern "C"
   } glr_parse_error_t;
 
   /**
-   * @typedef glr_parse_result_t
+   * @struct glr_parse_result_t
    * @brief Result of a parse operation
    */
   typedef struct
@@ -52,7 +52,7 @@ extern "C"
   } glr_parse_result_t;
 
   /**
-   * @typedef glr_parser_t
+   * @struct glr_parser_t
    * @brief GLR parser instance
    *
    * Contains all state needed for GLR parsing, including

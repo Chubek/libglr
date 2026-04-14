@@ -50,7 +50,7 @@ extern "C"
   } glr_disambig_result_t;
 
   /**
-   * @typedef glr_disambig_candidate_t
+   * @struct glr_disambig_candidate_t
    * @brief One ambiguous candidate for an SPPF node
    */
   typedef struct
@@ -73,7 +73,7 @@ extern "C"
   } glr_disambig_candidate_t;
 
   /**
-   * @typedef glr_disambig_context_t
+   * @struct glr_disambig_context_t
    * @brief Full ambiguity context passed to hooks
    */
   typedef struct
@@ -107,7 +107,7 @@ extern "C"
   typedef void (*glr_disambig_destroy_fn) (void *user_data);
 
   /**
-   * @typedef glr_disambig_hook_t
+   * @struct glr_disambig_hook_t
    * @brief One disambiguation hook registered on a parser
    */
   typedef struct glr_disambig_hook

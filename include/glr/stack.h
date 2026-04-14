@@ -20,7 +20,7 @@ extern "C"
 #endif
 
   /**
-   * @typedef glr_stack_node_t
+   * @struct glr_stack_node_t
    * @brief A node in the DAG-based stack
    *
    * Each node represents a stack frame and can fork into multiple
@@ -29,7 +29,7 @@ extern "C"
   typedef struct glr_stack_node glr_stack_node_t;
 
   /**
-   * @typedef glr_stack_t
+   * @struct glr_stack_t
    * @brief DAG-based stack container
    *
    * Manages the stack of parse states and handles forking operations.

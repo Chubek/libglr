@@ -19,7 +19,7 @@ extern "C"
 #endif
 
   /**
-   * @typedef glr_item_t
+   * @struct glr_item_t
    * @brief LR(0) item
    *
    * An item represents a production with a dot indicating
@@ -33,7 +33,7 @@ extern "C"
   } glr_item_t;
 
   /**
-   * @typedef glr_item_set_t
+   * @struct glr_item_set_t
    * @brief Set of LR(0) items
    *
    * A collection of items representing parser state.
@@ -46,7 +46,7 @@ extern "C"
   } glr_item_set_t;
 
   /**
-   * @typedef glr_reduction_t
+   * @struct glr_reduction_t
    * @brief A reduction operation
    *
    * Represents a complete reduction of a production at a given position.
