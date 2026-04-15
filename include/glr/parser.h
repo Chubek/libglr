@@ -3,6 +3,8 @@
 
 #include <glr/forest.h>
 #include <glr/grammar.h>
+#include <glr/lexer-hooks.h>
+#include <glr/reader.h>
 #include <glr/reduction.h>
 #include <glr/stack.h>
 #include <stdbool.h>
@@ -71,6 +73,9 @@ extern "C"
     const char *input;       ///< Current input
     size_t input_pos;        ///< Current input position
     size_t input_length;     ///< Total input length
+    glr_reader_t *reader;    ///< Token reader used for UTF-16 inputs
+    glr_lexer_hooks_t *lexer_hooks; ///< Optional pluggable lexer hooks
+    glr_reader_token_t lookahead;   ///< Last token produced by the reader
     glr_parse_error_t error; ///< Last error
     void *user_data;         ///< User data
   };
@@ -111,6 +116,33 @@ extern "C"
    */
   glr_parse_result_t glr_parse (glr_parser_t *parser, const char *input,
                                 size_t length);
+
+  /**
+   * @brief Configure lexer hooks used when parsing UTF-16 input.
+   *
+   * The parser does not take ownership of @p hooks.
+   *
+   * @param parser Pointer to parser
+   * @param hooks Hook registry or NULL to disable custom tokenization
+   * @return 0 on success, -1 on failure
+   */
+  int glr_parser_set_lexer_hooks (glr_parser_t *parser, glr_lexer_hooks_t *hooks);
+
+  /**
+   * @brief Get the lexer hooks configured on the parser.
+   *
+   * @param parser Pointer to parser
+   * @return Hook registry or NULL
+   */
+  glr_lexer_hooks_t *glr_parser_get_lexer_hooks (const glr_parser_t *parser);
+
+  /**
+   * @brief Get the most recent token observed by the parser.
+   *
+   * @param parser Pointer to parser
+   * @return Last token or NULL when no token has been produced yet
+   */
+  const glr_reader_token_t *glr_parser_get_last_token (const glr_parser_t *parser);
 
   /**
    * @brief Set user data for the parser
