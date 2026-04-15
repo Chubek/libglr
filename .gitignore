@@ -221,3 +221,7 @@ AGENTS.md
 
 # Bindings
 _bindings_
+
+# Python
+__pycache__/
+*.pyc
