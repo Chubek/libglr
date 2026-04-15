@@ -1,0 +1,44 @@
+cc = cc
+ar = ar
+cflags = -Iinclude -Ithird_party/sfsexp/src -std=c11 -Wall -Wextra -Wpedantic
+
+rule cc
+  command = $cc $cflags -c $in -o $out
+  description = CC $out
+
+rule ar
+  command = $ar rcs $out $in
+  description = AR $out
+
+rule link
+  command = $cc $in -o $out
+  description = LINK $out
+
+build out/grammar.o: cc src/glr/grammar.c
+build out/stack.o: cc src/glr/stack.c
+build out/fork.o: cc src/glr/fork.c
+build out/forest.o: cc src/glr/forest.c
+build out/reduction.o: cc src/glr/reduction.c
+build out/graph.o: cc src/glr/graph.c
+build out/parser.o: cc src/glr/parser.c
+build out/disambiguate.o: cc src/glr/disambiguate.c
+build out/rewrite.o: cc src/glr/rewrite.c
+build out/cstring.o: cc third_party/sfsexp/src/cstring.c
+build out/event_temp.o: cc third_party/sfsexp/src/event_temp.c
+build out/faststack.o: cc third_party/sfsexp/src/faststack.c
+build out/io.o: cc third_party/sfsexp/src/io.c
+build out/sfparser.o: cc third_party/sfsexp/src/parser.c
+build out/sexp.o: cc third_party/sfsexp/src/sexp.c
+build out/sexp_memory.o: cc third_party/sfsexp/src/sexp_memory.c
+build out/sexp_ops.o: cc third_party/sfsexp/src/sexp_ops.c
+build out/sexp_vis.o: cc third_party/sfsexp/src/sexp_vis.c
+
+build out/libsfsexp.a: ar out/cstring.o out/event_temp.o out/faststack.o out/io.o out/sfparser.o out/sexp.o out/sexp_memory.o out/sexp_ops.o out/sexp_vis.o
+build out/libglr.a: ar out/grammar.o out/stack.o out/fork.o out/forest.o out/reduction.o out/graph.o out/parser.o out/disambiguate.o out/rewrite.o
+build out/test_rewrite.o: cc tests/test_rewrite.c
+build out/test_rewrite: link out/test_rewrite.o out/libglr.a out/libsfsexp.a
+
+build all: phony out/libsfsexp.a out/libglr.a out/test_rewrite
+build test: phony out/test_rewrite
+
+default all

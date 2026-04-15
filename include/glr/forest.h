@@ -125,7 +125,7 @@ extern "C"
    * @brief Add an edge to the forest
    *
    * @param forest Pointer to forest
-   * @param edge Edge to add
+   * @param edge Edge to add; the forest stores an internal copy
    * @return 0 on success, -1 on failure
    */
   int glr_forest_add_edge (glr_forest_t *forest, glr_forest_edge_t *edge);

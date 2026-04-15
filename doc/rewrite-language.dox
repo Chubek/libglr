@@ -1,0 +1,35 @@
+/**
+ * @page glr_rewrite_language GLR Rewrite Language
+ *
+ * GRL is a small S-expression language for grammar normalization.
+ *
+ * @section grl_shape Program shape
+ *
+ * @code{.lisp}
+ * (rewrite
+ *   (name "normalize")
+ *   (rules
+ *     (remove-epsilon-productions)
+ *     (remove-unit-productions)
+ *     (remove-left-recursion)
+ *     (left-factor)
+ *     (eliminate-useless-symbols)))
+ * @endcode
+ *
+ * @section grl_rules Supported rules
+ *
+ * - @c (add-symbol terminal NAME)
+ * - @c (add-symbol nonterminal NAME)
+ * - @c (drop-symbol NAME)
+ * - @c (rename-symbol OLD NEW)
+ * - @c (set-start NAME)
+ * - @c (add-production HEAD (SYM1 SYM2 ...))
+ * - @c (drop-production HEAD (SYM1 SYM2 ...))
+ * - @c (remove-epsilon-productions)
+ * - @c (remove-unit-productions)
+ * - @c (eliminate-useless-symbols)
+ * - @c (remove-left-recursion)
+ * - @c (left-factor)
+ * - @c (make-lr-compatible)
+ * - @c (eliminate-ambiguity)
+ */

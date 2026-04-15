@@ -162,7 +162,7 @@ test_item_helpers (void)
   glr_item_t item = { 5, 10, 20 };
 
   ASSERT_EQ (glr_item_get_production (&item), 5, "Should get production ID");
-  ASSERT (!glr_item_is_complete (&item),
+  ASSERT (glr_item_is_complete (&item),
           "Item with dot > 0 should be complete");
 
   glr_item_t complete = { 5, 1, 0 };

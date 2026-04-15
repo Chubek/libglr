@@ -158,6 +158,8 @@ glr_forest_get_children (glr_forest_node_t *node)
 int
 glr_forest_add_edge (glr_forest_t *forest, glr_forest_edge_t *edge)
 {
+  glr_forest_edge_t *stored_edge;
+
   if (forest == NULL || edge == NULL)
     {
       return -1;
@@ -181,9 +183,15 @@ glr_forest_add_edge (glr_forest_t *forest, glr_forest_edge_t *edge)
       forest->edge_count = new_count;
     }
 
-  /* Add edge to linked list at position */
-  edge->next = forest->edges[edge->end_position];
-  forest->edges[edge->end_position] = edge;
+  stored_edge = calloc (1, sizeof (*stored_edge));
+  if (stored_edge == NULL)
+    {
+      return -1;
+    }
+
+  *stored_edge = *edge;
+  stored_edge->next = forest->edges[edge->end_position];
+  forest->edges[edge->end_position] = stored_edge;
 
   return 0;
 }

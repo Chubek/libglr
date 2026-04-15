@@ -24,6 +24,7 @@
  * - @ref graph.h - Graph operations for forests
  * - @ref parser.h - Parser core infrastructure
  * - @ref disambiguation_api - Disambiguation API and standard strategies
+ * - @ref rewrite_api - Grammar rewriting and normalization
  *
  * @note All public APIs are documented with Doxygen comments.
  *       The library uses the "3tb" manpage section (e.g., libglr.3tb).
@@ -34,7 +35,10 @@
 #include "fork.h"
 #include "grammar.h"
 #include "graph.h"
+#include "lexer-hooks.h"
 #include "parser.h"
+#include "reader.h"
+#include "rewrite.h"
 #include "reduction.h"
 #include "stack.h"
 

@@ -35,6 +35,8 @@ if(DOXYGEN_FOUND)
         ${CMAKE_CURRENT_SOURCE_DIR}/../include
         ${CMAKE_CURRENT_SOURCE_DIR}/../disambstd
         ${CMAKE_CURRENT_SOURCE_DIR}/../README.md
+        ${CMAKE_CURRENT_SOURCE_DIR}/rewrite-language.dox
+        ${CMAKE_CURRENT_SOURCE_DIR}/procedural-rewrite-api.dox
         COMMENT "Generating API documentation with Doxygen"
     )
 else()

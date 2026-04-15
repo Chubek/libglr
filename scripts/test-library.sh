@@ -1,127 +1,62 @@
 #!/bin/bash
-# test-library.sh - Run LibGLR test suite
-#
-# Usage: ./scripts/test-library.sh [options]
-# Options:
-#   --build     Build tests before running
-#   --clean     Clean build artifacts before building
-#   --verbose   Enable verbose output
+# test-library.sh - configure, build, and run the LibGLR test suite
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="${PROJECT_DIR}/build"
-
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
-
-log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
-}
-
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
+BUILD_TYPE=Debug
+VERBOSE=false
+CLEAN=false
+LABELS=""
+SANITIZERS=false
 
 usage() {
-    echo "Usage: $0 [options]"
-    echo ""
-    echo "Options:"
-    echo "  --build     Build tests before running"
-    echo "  --clean     Clean build artifacts before building"
-    echo "  --verbose   Enable verbose output"
-    echo "  --help      Show this help message"
-    echo ""
-}
+    cat <<USAGE
+Usage: $0 [options]
 
-build() {
-    local verbose=""
-    if [[ "$VERBOSE" == "true" ]]; then
-        verbose="-v"
-    fi
-    
-    log_info "Building LibGLR tests..."
-    
-    if [[ "$CLEAN" == "true" ]]; then
-        log_info "Cleaning build directory..."
-        rm -rf "$BUILD_DIR"
-    fi
-    
-    mkdir -p "$BUILD_DIR"
-    cd "$BUILD_DIR"
-    
-    cmake .. -DCMAKE_BUILD_TYPE=Release $verbose
-    cmake --build . $verbose
-    
-    if [[ $? -ne 0 ]]; then
-        log_error "Build failed"
-        exit 1
-    fi
-    
-    log_info "Build successful"
+Options:
+  --clean           Remove the build directory before configuring
+  --verbose         Run ctest with verbose output
+  --label LABEL     Run only tests matching a CTest label
+  --sanitizers      Configure tests with address/undefined sanitizers
+  --build-type TYPE CMake build type (default: Debug)
+  --help            Show this help message
+USAGE
 }
-
-run_tests() {
-    log_info "Running tests..."
-    cd "$BUILD_DIR"
-    
-    local verbose=""
-    if [[ "$VERBOSE" == "true" ]]; then
-        verbose="--verbose"
-    fi
-    
-    ctest $verbose --output-on-failure
-    
-    if [[ $? -ne 0 ]]; then
-        log_error "Tests failed"
-        exit 1
-    fi
-    
-    log_info "All tests passed"
-}
-
-# Parse arguments
-BUILD=false
-CLEAN=false
-VERBOSE=false
 
 while [[ $# -gt 0 ]]; do
-    case $1 in
-        --build)
-            BUILD=true
-            shift
-            ;;
-        --clean)
-            CLEAN=true
-            shift
-            ;;
-        --verbose)
-            VERBOSE=true
-            shift
-            ;;
-        --help)
-            usage
-            exit 0
-            ;;
-        *)
-            log_error "Unknown option: $1"
-            usage
-            exit 1
-            ;;
+    case "$1" in
+        --clean) CLEAN=true; shift ;;
+        --verbose) VERBOSE=true; shift ;;
+        --label) LABELS="$2"; shift 2 ;;
+        --sanitizers) SANITIZERS=true; shift ;;
+        --build-type) BUILD_TYPE="$2"; shift 2 ;;
+        --help) usage; exit 0 ;;
+        *) echo "Unknown option: $1" >&2; usage; exit 1 ;;
     esac
 done
 
-# Main execution
-if [[ "$BUILD" == "true" ]]; then
-    build
+if [[ "$CLEAN" == true ]]; then
+    rm -rf "$BUILD_DIR"
 fi
 
-run_tests
+cmake -S "$PROJECT_DIR" -B "$BUILD_DIR" \
+    -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+    -DBUILD_TESTS=ON \
+    -DBUILD_EXAMPLES=OFF \
+    -DBUILD_DOCUMENTATION=OFF \
+    -DENABLE_TEST_SANITIZERS=$([[ "$SANITIZERS" == true ]] && echo ON || echo OFF)
+
+cmake --build "$BUILD_DIR"
+
+ctest_args=(--test-dir "$BUILD_DIR" --output-on-failure)
+if [[ "$VERBOSE" == true ]]; then
+    ctest_args+=(--verbose)
+fi
+if [[ -n "$LABELS" ]]; then
+    ctest_args+=(-L "$LABELS")
+fi
+
+ctest "${ctest_args[@]}"

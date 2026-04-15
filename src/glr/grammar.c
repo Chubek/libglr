@@ -116,7 +116,7 @@ int
 glr_grammar_add_production (glr_grammar_t *grammar, int head_id,
                             glr_symbol_t **body, size_t body_length)
 {
-  if (grammar == NULL || head_id < 0 || body == NULL)
+  if (grammar == NULL || head_id < 0)
     {
       return -1;
     }
@@ -140,7 +140,8 @@ glr_grammar_add_production (glr_grammar_t *grammar, int head_id,
   production->body_length = body_length;
 
   /* Copy body symbols */
-  production->body = malloc (body_length * sizeof (glr_symbol_t *));
+  production->body = calloc (body_length == 0 ? 1 : body_length,
+                             sizeof (glr_symbol_t *));
   if (production->body == NULL)
     {
       free (production);
@@ -149,6 +150,12 @@ glr_grammar_add_production (glr_grammar_t *grammar, int head_id,
 
   for (size_t i = 0; i < body_length; i++)
     {
+      if (body == NULL || body[i] == NULL)
+        {
+          free (production->body);
+          free (production);
+          return -1;
+        }
       production->body[i] = body[i];
     }
 

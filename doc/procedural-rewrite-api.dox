@@ -1,0 +1,13 @@
+/**
+ * @page glr_procedural_rewrite_api Procedural Rewrite API
+ *
+ * The procedural API mirrors GRL and is documented in @ref rewrite_api.
+ * Typical flow:
+ *
+ * - create or load a grammar
+ * - load or build a @ref glr_rewrite_program_t
+ * - apply it with @ref glr_rewrite_program_apply
+ * - inspect @ref glr_rewrite_report_t for progress and failure status
+ *
+ * Direct one-shot helpers are available for all standard transforms.
+ */

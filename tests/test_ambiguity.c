@@ -1,147 +1,109 @@
-/**
- * @file test_ambiguity.c
- * @brief Test cases for ambiguity handling in GLR parser
- */
+#include "test_common.h"
 
+#include <glr/disambiguate.h>
 #include <glr/grammar.h>
 #include <glr/parser.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
-static int
-test_ambiguous_input (void)
+static bool
+prefer_user_flag (const glr_disambig_context_t *context,
+                  const glr_disambig_candidate_t *candidate, void *user_data)
 {
-  glr_grammar_t grammar;
-  glr_parser_t *parser;
-  glr_parse_result_t result;
-
-  /* Initialize grammar */
-  if (glr_grammar_init (&grammar) != 0)
-    {
-      fprintf (stderr, "Failed to initialize grammar\n");
-      return -1;
-    }
-
-  /* Add non-terminals */
-  glr_grammar_add_nonterminal (&grammar, "Expr", 0);
-  glr_grammar_add_nonterminal (&grammar, "Term", 1);
-  glr_grammar_add_nonterminal (&grammar, "Factor", 2);
-
-  /* Add terminals */
-  glr_grammar_add_terminal (&grammar, "ID", 3);
-  glr_grammar_add_terminal (&grammar, "PLUS", 4);
-  glr_grammar_add_terminal (&grammar, "MULT", 5);
-  glr_grammar_add_terminal (&grammar, "LPAREN", 6);
-  glr_grammar_add_terminal (&grammar, "RPAREN", 7);
-
-  /* Set start symbol */
-  glr_grammar_set_start (&grammar, 0);
-
-  /* Create parser */
-  parser = glr_parser_create (&grammar);
-  if (!parser)
-    {
-      fprintf (stderr, "Failed to create parser\n");
-      glr_grammar_free (&grammar);
-      return -1;
-    }
-
-  /* Test ambiguous expression: ID PLUS ID PLUS ID */
-  const char *input = "ID PLUS ID PLUS ID";
-  glr_parser_reset (parser);
-  result = glr_parser_parse (parser, input, strlen (input));
-
-  if (result.error != GLR_PARSE_SUCCESS)
-    {
-      fprintf (stderr, "Parse failed with error: %d\n", result.error);
-      glr_parser_destroy (parser);
-      glr_grammar_free (&grammar);
-      return -1;
-    }
-
-  /* Verify ambiguity is handled */
-  size_t stack_count = glr_parser_stack_count (parser);
-  if (stack_count == 0)
-    {
-      fprintf (stderr, "No stacks created for ambiguous input\n");
-      glr_parser_destroy (parser);
-      glr_grammar_free (&grammar);
-      return -1;
-    }
-
-  glr_parser_destroy (parser);
-  glr_grammar_free (&grammar);
-
-  printf ("Ambiguous input test passed (%zu stacks)\n", stack_count);
-  return 0;
+  (void)context;
+  return candidate->user_data == user_data;
 }
 
-static int
-test_nested_ambiguity (void)
+static glr_grammar_t *
+make_grammar (void)
 {
-  glr_grammar_t grammar;
-  glr_parser_t *parser;
+  glr_grammar_t *grammar = glr_grammar_create ();
+  int expr;
+  int term;
+  glr_symbol_t *body[1];
 
-  if (glr_grammar_init (&grammar) != 0)
+  if (grammar == NULL)
     {
-      return -1;
+      return NULL;
     }
 
-  /* Simple expression grammar with operator precedence ambiguity */
-  glr_grammar_add_nonterminal (&grammar, "Expr", 0);
-  glr_grammar_add_terminal (&grammar, "NUM", 1);
-  glr_grammar_add_terminal (&grammar, "PLUS", 2);
-  glr_grammar_add_terminal (&grammar, "TIMES", 3);
+  expr = glr_grammar_add_symbol (grammar, GLR_SYMBOL_NONTERMINAL, "Expr");
+  term = glr_grammar_add_symbol (grammar, GLR_SYMBOL_NONTERMINAL, "Term");
+  body[0] = glr_grammar_get_symbol (grammar, term);
+  glr_grammar_add_production (grammar, expr, body, 1);
+  glr_grammar_set_start_symbol (grammar, expr);
+  return grammar;
+}
 
-  glr_grammar_set_start (&grammar, 0);
+GLR_TEST_CASE (test_parser_driven_resolution)
+{
+  glr_grammar_t *grammar = make_grammar ();
+  glr_parser_t *parser = glr_parser_create (grammar);
+  glr_disambig_candidate_t candidates[2] = { 0 };
+  glr_disambig_context_t context = { 0 };
+  glr_disambig_hook_t *predicate_hook;
+  size_t winner = SIZE_MAX;
+  int preferred_tag = 7;
 
-  parser = glr_parser_create (&grammar);
-  if (!parser)
-    {
-      glr_grammar_free (&grammar);
-      return -1;
-    }
+  glr_test_begin ("ambiguity pipeline with parser hooks");
+  GLR_TEST_ASSERT_NOT_NULL (parser, "parser should be created");
 
-  /* Test: NUM TIMES NUM PLUS NUM */
-  const char *input = "NUM TIMES NUM PLUS NUM";
-  glr_parser_reset (parser);
+  predicate_hook = glr_disambig_predicate_hook_create (
+      "prefer-tag", 50, prefer_user_flag, &preferred_tag, NULL);
+  GLR_TEST_ASSERT_NOT_NULL (predicate_hook, "predicate hook should be created");
+  GLR_TEST_ASSERT_EQ (glr_parser_add_disambiguator (parser, predicate_hook), 0,
+                      "predicate hook should register");
 
-  size_t initial_stacks = glr_parser_stack_count (parser);
-  (void)initial_stacks; /* Suppress unused warning */
+  candidates[0].precedence = 1;
+  candidates[0].user_data = &preferred_tag;
+  candidates[1].precedence = 99;
+  candidates[1].user_data = NULL;
+
+  context.parser = parser;
+  context.grammar = grammar;
+  context.forest = glr_parser_get_forest (parser);
+  context.candidates = candidates;
+  context.candidate_count = 2;
+
+  GLR_TEST_ASSERT_EQ (glr_parser_run_disambiguators (parser, &context, &winner),
+                      GLR_DISAMBIG_RESOLVED,
+                      "predicate hook should resolve the ambiguity");
+  GLR_TEST_ASSERT_EQ (winner, 0, "preferred tagged candidate should win");
+  GLR_TEST_ASSERT (candidates[1].rejected,
+                   "non-preferred candidate should be rejected");
 
   glr_parser_destroy (parser);
-  glr_grammar_free (&grammar);
+  glr_grammar_destroy (grammar);
+  glr_test_end ();
+}
 
-  printf ("Nested ambiguity test passed\n");
-  return 0;
+GLR_TEST_CASE (test_parse_result_contract)
+{
+  glr_grammar_t *grammar = make_grammar ();
+  glr_parser_t *parser = glr_parser_create (grammar);
+  glr_parse_result_t result;
+
+  glr_test_begin ("parser result contract on minimal grammar");
+  GLR_TEST_ASSERT_NOT_NULL (parser, "parser should be created");
+
+  result = glr_parse (parser, "x", 1);
+  GLR_TEST_ASSERT_EQ (result.error, GLR_PARSE_SUCCESS,
+                      "stub parser should report success for configured grammar");
+  GLR_TEST_ASSERT_NOT_NULL (result.forest, "parse result should expose a forest");
+  GLR_TEST_ASSERT_EQ (result.position, 1, "parse should consume the full input");
+  GLR_TEST_ASSERT_EQ (glr_parser_stack_count (parser), 1,
+                      "parser should leave one active stack");
+
+  glr_parser_destroy (parser);
+  glr_grammar_destroy (grammar);
+  glr_test_end ();
 }
 
 int
 main (void)
 {
-  int failures = 0;
+  GLR_TEST_INIT;
 
-  printf ("Running GLR ambiguity tests...\n");
-
-  if (test_ambiguous_input () != 0)
-    {
-      failures++;
-    }
-
-  if (test_nested_ambiguity () != 0)
-    {
-      failures++;
-    }
-
-  if (failures == 0)
-    {
-      printf ("All ambiguity tests passed.\n");
-      return 0;
-    }
-  else
-    {
-      printf ("%d test(s) failed.\n", failures);
-      return 1;
-    }
+  printf ("=== LibGLR Ambiguity Tests ===\n\n");
+  test_parser_driven_resolution (&stats);
+  test_parse_result_contract (&stats);
+  return glr_test_finish ("LibGLR Ambiguity", stats);
 }

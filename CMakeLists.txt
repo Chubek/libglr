@@ -10,8 +10,30 @@ option(BUILD_TESTS "Build test suite" ON)
 option(BUILD_EXAMPLES "Build examples" ON)
 option(BUILD_DOCUMENTATION "Build documentation" ON)
 option(BUILD_DISAMBSTD "Build the standard disambiguation library" ON)
+option(BUILD_REWRITELIB "Install the standard rewrite library" ON)
+option(BUILD_SWIG_BINDINGS "Build SWIG bindings when SWIG is available" OFF)
+option(ENABLE_TEST_SANITIZERS "Enable address/undefined sanitizers for tests" OFF)
 
-# Library sources - only .c files in src
+# Bundle the local S-expression parser used by the rewrite subsystem.
+file(GLOB SFSEXP_SOURCES CONFIGURE_DEPENDS
+    third_party/sfsexp/src/*.c
+)
+add_library(sfsexp STATIC ${SFSEXP_SOURCES})
+target_include_directories(sfsexp
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/sfsexp/src>
+        $<INSTALL_INTERFACE:include/libglr/third_party/sfsexp>)
+target_compile_options(sfsexp PRIVATE -w)
+install(TARGETS sfsexp
+    EXPORT ${PROJECT_NAME}-exports
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+)
+install(DIRECTORY third_party/sfsexp/src/
+    DESTINATION include/libglr/third_party/sfsexp
+    FILES_MATCHING PATTERN "*.h")
+
+# Library sources
 set(GLR_SOURCES
     src/glr/grammar.c
     src/glr/stack.c
@@ -21,6 +43,9 @@ set(GLR_SOURCES
     src/glr/graph.c
     src/glr/parser.c
     src/glr/disambiguate.c
+    src/glr/lexer-hooks.c
+    src/glr/reader.c
+    src/glr/rewrite.c
 )
 
 # Create library
@@ -30,9 +55,11 @@ add_library(${PROJECT_NAME} STATIC ${GLR_SOURCES})
 target_include_directories(${PROJECT_NAME}
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
         $<INSTALL_INTERFACE:include>
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party
 )
+target_link_libraries(${PROJECT_NAME} PUBLIC sfsexp)
 
 # Set compile options
 target_compile_options(${PROJECT_NAME} PRIVATE
@@ -64,7 +91,9 @@ install(FILES
     include/glr/graph.h
     include/glr/parser.h
     include/glr/disambiguate.h
-    include/glr/disambiguate-hooks.h
+    include/glr/lexer-hooks.h
+    include/glr/reader.h
+    include/glr/rewrite.h
     DESTINATION include/glr
 )
 
@@ -80,6 +109,10 @@ install(EXPORT ${PROJECT_NAME}-exports
     DESTINATION lib/cmake/${PROJECT_NAME}
 )
 
+if(BUILD_DISAMBSTD)
+    add_subdirectory(disambstd)
+endif()
+
 # Tests
 if(BUILD_TESTS)
     enable_testing()
@@ -91,8 +124,12 @@ if(BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
 
-if(BUILD_DISAMBSTD)
-    add_subdirectory(disambstd)
+if(BUILD_REWRITELIB)
+    add_subdirectory(rewritelib)
+endif()
+
+if(BUILD_SWIG_BINDINGS)
+    add_subdirectory(bindings)
 endif()
 
 # Generate package config file
