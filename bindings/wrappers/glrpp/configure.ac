@@ -4,6 +4,7 @@ AC_CONFIG_SRCDIR([include/glrpp])
 AC_CONFIG_AUX_DIR([build-aux])
 AM_INIT_AUTOMAKE([foreign subdir-objects no-dist-gzip dist-xz tar-ustar])
 AC_LANG([C++])
+LT_INIT
 
 # ------------------------------------------------------------
 # Compiler checks
@@ -80,6 +81,19 @@ AS_IF([test "x$enable_bindings" = "xyes"], [
     [AC_MSG_ERROR([libglr not found or missing glr_parse symbol])]
   )
 ])
+
+AC_CHECK_LIB([dl], [dlopen], [LIBDL="-ldl"], [LIBDL=""])
+AC_SUBST([LIBDL])
+
+case $host_os in
+  darwin*) glrpp_os_darwin=yes; glrpp_os_windows=no; glrpp_os_unix=yes ;;
+  mingw* | msys* | cygwin*) glrpp_os_darwin=no; glrpp_os_windows=yes; glrpp_os_unix=no ;;
+  *) glrpp_os_darwin=no; glrpp_os_windows=no; glrpp_os_unix=yes ;;
+esac
+
+AM_CONDITIONAL([OS_UNIX], [test "x$glrpp_os_unix" = "xyes"])
+AM_CONDITIONAL([OS_DARWIN], [test "x$glrpp_os_darwin" = "xyes"])
+AM_CONDITIONAL([OS_WINDOWS], [test "x$glrpp_os_windows" = "xyes"])
 
 # ------------------------------------------------------------
 # Output files

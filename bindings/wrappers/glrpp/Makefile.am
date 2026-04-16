@@ -9,6 +9,8 @@ AM_CPPFLAGS = \
     -I$(srcdir)/third_party/brigand/include \
     -I$(srcdir)/third_party/ctre/include \
     -I$(srcdir)/third_party/frozen/include \
+    -I$(srcdir)/third_party/libltdl \
+    -I$(srcdir)/third_party/libltdl/libltdl \
     -I$(srcdir)/third_party/magic_enum/include \
     -I$(srcdir)/third_party/nameof/include \
     -I$(srcdir)/third_party/pfr/include \
@@ -29,6 +31,33 @@ EXTRA_DIST = \
 noinst_LIBRARIES =
 noinst_PROGRAMS =
 noinst_DATA =
+lib_LTLIBRARIES = libltdl.la
+
+libltdl_la_SOURCES = \
+    third_party/libltdl/ltdl.c \
+    third_party/libltdl/lt_dlloader.c \
+    third_party/libltdl/lt_error.c \
+    third_party/libltdl/lt__alloc.c \
+    third_party/libltdl/lt__argz.c \
+    third_party/libltdl/lt__dirent.c \
+    third_party/libltdl/lt__strl.c \
+    third_party/libltdl/slist.c \
+    third_party/libltdl/loaders/preopen.c
+
+if OS_UNIX
+libltdl_la_SOURCES += third_party/libltdl/loaders/dlopen.c
+endif
+
+if OS_DARWIN
+libltdl_la_SOURCES += third_party/libltdl/loaders/dyld.c
+endif
+
+if OS_WINDOWS
+libltdl_la_SOURCES += third_party/libltdl/loaders/loadlibrary.c
+endif
+
+libltdl_la_LDFLAGS = -no-undefined -version-info 7:0:0
+libltdl_la_LIBADD = $(LIBDL)
 
 glrpp:
 	@echo "Header-only library: nothing to build."
@@ -46,10 +75,10 @@ $(SWIG_SOURCES): bindings/glr.i
 	$(SWIG) -c++ -python -o glrpp_glr_bindings.cpp $(srcdir)/bindings/glr.i
 
 # Shared library
-lib_LTLIBRARIES = libglrpp_glr_bindings.la
+lib_LTLIBRARIES += libglrpp_glr_bindings.la
 libglrpp_glr_bindings_la_SOURCES = glrpp_glr_bindings.cpp
 libglrpp_glr_bindings_la_LDFLAGS = -shared
-libglrpp_glr_bindings_la_LIBADD = -lglr
+libglrpp_glr_bindings_la_LIBADD = -lglr libltdl.la $(LIBDL)
 
 endif
 

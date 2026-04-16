@@ -18,6 +18,7 @@ option(GLRPP_INSTALL "Install glrpp headers and bindings" ON)
 # -------------------------------------------------------
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+include(GNUInstallDirs)
 
 # Python helper scripts
 set(GLRPP_ARCHIVER_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/glrpp/scripts/archive-services.py")
@@ -26,16 +27,20 @@ set(GLRPP_DOCSTRING_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/glrpp/scripts/docstring-
 # -------------------------------------------------------
 # Header-only target
 # -------------------------------------------------------
+add_subdirectory(third_party/libltdl EXCLUDE_FROM_ALL)
+
 add_library(glrpp INTERFACE)
 target_include_directories(glrpp INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/brigand/include
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ctre/include
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/frozen/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/libltdl
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/magic_enum/include
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/nameof/include
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/pfr/include
 )
+target_link_libraries(glrpp INTERFACE ltdl)
 
 # -------------------------------------------------------
 # SWIG Bindings

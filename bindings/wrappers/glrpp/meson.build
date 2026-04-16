@@ -5,6 +5,8 @@ project(
   default_options: ['cpp_std=c++20']
 )
 
+cc = meson.get_compiler('c')
+
 # ============================================================
 # Meson build options
 # ============================================================
@@ -31,17 +33,54 @@ docstring_script  = scripts_dir / 'docstring-services.py'
 glrpp_inc = include_directories(
   'include',
   'third_party/brigand/include',
-  'third_party/ctre/include',
+  'third_party/compile-time-regular-expressions/include',
   'third_party/frozen/include',
+  'third_party/libltdl',
   'third_party/magic_enum/include',
   'third_party/nameof/include',
   'third_party/pfr/include'
+)
+
+libltdl_inc = include_directories(
+  'third_party/libltdl',
+  'third_party/libltdl/libltdl'
+)
+
+libltdl_sources = files(
+  'third_party/libltdl/ltdl.c',
+  'third_party/libltdl/lt_dlloader.c',
+  'third_party/libltdl/lt_error.c',
+  'third_party/libltdl/lt__alloc.c',
+  'third_party/libltdl/lt__argz.c',
+  'third_party/libltdl/lt__dirent.c',
+  'third_party/libltdl/lt__strl.c',
+  'third_party/libltdl/slist.c',
+  'third_party/libltdl/loaders/preopen.c',
+)
+
+if host_machine.system() == 'darwin'
+  libltdl_sources += files('third_party/libltdl/loaders/dyld.c')
+elif host_machine.system() == 'windows'
+  libltdl_sources += files('third_party/libltdl/loaders/loadlibrary.c')
+else
+  libltdl_sources += files('third_party/libltdl/loaders/dlopen.c')
+endif
+
+libdl_dep = cc.find_library('dl', required: false)
+
+libltdl_lib = library(
+  'ltdl',
+  libltdl_sources,
+  include_directories: libltdl_inc,
+  dependencies: libdl_dep.found() ? [libdl_dep] : [],
+  install: install_libs
 )
 
 glrpp_lib = library(
   'glrpp',
   [],                       # header-only
   include_directories: glrpp_inc,
+  link_with: libltdl_lib,
   install: install_libs,
   install_dir: get_option('includedir'),
   link_whole: true,
@@ -70,6 +109,7 @@ if build_bindings
     swig_out,
     include_directories: [glrpp_inc],
     dependencies: [libglr],
+    link_with: libltdl_lib,
     install: install_libs
   )
 endif
