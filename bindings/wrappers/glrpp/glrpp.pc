@@ -1,0 +1,16 @@
+prefix=@prefix@
+exec_prefix=${prefix}
+includedir=${prefix}/include
+libdir=${prefix}/lib
+datarootdir=${prefix}/share
+
+Name: glrpp
+Description: Header-only C++20 DSL wrapper for libglr, with optional SWIG bindings
+Version: @PACKAGE_VERSION@
+URL: https://example.com/glrpp
+
+Requires:
+Requires.private: glr
+Libs: -L${libdir} -lglrpp_glr_bindings
+Libs.private: -lglr
+Cflags: -I${includedir}
