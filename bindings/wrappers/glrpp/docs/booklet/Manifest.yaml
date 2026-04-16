@@ -1,0 +1,237 @@
+booklet:
+  title: "GLR++: A Comprehensive Guide"
+  chapters:
+
+    - file: glrpp-what-is-glr-parsing.md
+      describes: >
+        High-level introduction to GLR parsing, why it exists,
+        how it differs from LL/LR, and what problems it solves.
+
+    - file: glrpp-setting-up.md
+      describes: >
+        Step-by-step instructions on preparing a development
+        environment for GLR++, required tools, dependencies, and folder layout.
+
+    - file: glrpp-installation.md
+      describes: >
+        How to acquire, install, or integrate GLR++ into a C++ project
+        (header-only usage, linking notes, build systems).
+
+    - file: glrpp-basic-usage.md
+      describes: >
+        A beginner-friendly walkthrough of using GLR++:
+        constructing a parser, feeding tokens/text, and obtaining parse results.
+
+    - file: glrpp-parser-object.md
+      describes: >
+        Detailed explanation of the central parser object, lifecycle,
+        invocation patterns, and ownership considerations.
+
+    - file: glrpp-reading-files.md
+      describes: >
+        How to read and buffer input text sources for the parser,
+        memory usage tradeoffs, incremental reading.
+
+    - file: glrpp-reading-tokens.md
+      describes: >
+        How tokens are delivered to the parser, token shapes,
+        controlling token streams, and text spans.
+
+    - file: glrpp-hooking-up-lexer.md
+      describes: >
+        Integrating a lexer with GLR++; interfaces, token emission strategies,
+        buffering models.
+
+    - file: glrpp-lexer-hooks.md
+      describes: >
+        Fine-grained hooks into lexical analysis, token transformations,
+        contextual lexing, and dynamic tokenization strategies.
+
+    - file: glrpp-hooking-the-reader.md
+      describes: >
+        Plugging in custom readers, stream sources, Unicode handling,
+        and preprocessing rules.
+
+    - file: glrpp-string-utils.md
+      describes: >
+        Utility functions for string views, slicing, normalization,
+        UTF-16/UTF-8 glue, and efficient text operations.
+
+    - file: glrpp-utf16-conversion.md
+      describes: >
+        Handling UTF‑16 inputs, conversion utilities, performance implications,
+        pitfalls, and platform differences.
+
+    - file: glrpp-what-are-nodes.md
+      describes: >
+        Explanation of syntax tree nodes, node identity, parenting,
+        and their role in GLR forests.
+
+    - file: glrpp-specifying-grammars.md
+      describes: >
+        How to write grammars for GLR++, notation, rules,
+        terminals/nonterminals, and recursive patterns.
+
+    - file: glrpp-native-dsl-specs.md
+      describes: >
+        Formal description of the native GLR++ grammar DSL,
+        syntax rules, semantics, and low-level constructs.
+
+    - file: glrpp-using-native-dsl.md
+      describes: >
+        Practical usage of the native DSL to define grammars,
+        examples, recommended style, and validation.
+
+    - file: glrpp-disambiguation-dsl.md
+      describes: >
+        How to express disambiguation constraints in the DSL:
+        precedence, associativity, filtering, custom rules.
+
+    - file: glrpp-disambiguation-forests.md
+      describes: >
+        Understanding GLR parse forests, ambiguity resolution,
+        forest pruning algorithms, and interpretive strategies.
+
+    - file: glrpp-actions-basics.md
+      describes: >
+        Introduction to semantic actions: attaching behavior to grammar rules,
+        mapping nodes, and simple AST construction.
+
+    - file: glrpp-semantic-actions.md
+      describes: >
+        Advanced semantic actions: captures, typed nodes,
+        integrating C++ lambdas, error handling within actions.
+
+    - file: glrpp-composing-via-pipelining.md
+      describes: >
+        Concept of composing grammar transformations and tree passes
+        using pipelines.
+
+    - file: glrpp-pipeline-operator.md
+      describes: >
+        The pipeline operator syntax and semantics, chaining passes,
+        building multi-stage parsing pipelines.
+
+    - file: glrpp-forking-parsers.md
+      describes: >
+        Techniques for speculative parsing, branching parser states,
+        and merging results.
+
+    - file: glrpp-rewrite-dsl.md
+      describes: >
+        DSL for expressing grammar and tree rewrites,
+        declarative transformations, and examples.
+
+    - file: glrpp-rewriting-grammars.md
+      describes: >
+        How to rewrite or transform grammars programmatically,
+        macro-expansions, normalization passes.
+
+    - file: glrpp-managing-ast.md
+      describes: >
+        AST management strategies, node ownership,
+        memory layout, mutability, and tree visitors.
+
+    - file: glrpp-handling-reflections.md
+      describes: >
+        Reflection metadata for grammars and nodes, compile-time introspection,
+        runtime querying.
+
+    - file: glrpp-managing-symbols.md
+      describes: >
+        Symbol tables, terminals, nonterminals, scopes,
+        and grammar symbol lifecycle.
+
+    - file: glrpp-managing-context.md
+      describes: >
+        How to manage parsing context across rules,
+        threading data through semantic actions,
+        and dynamic context adaptation.
+
+    - file: glrpp-managing-stack.md
+      describes: >
+        GLR stack structures, graph-structured stacks,
+        push/pop semantics, and conflict resolution mechanics.
+
+    - file: glrpp-managing-dependencies.md
+      describes: >
+        Handling module dependencies among grammars,
+        cross-file includes, and multi-grammar organization.
+
+    - file: glrpp-compile-time-regex.md
+      describes: >
+        Support for compile-time regular expressions within grammars,
+        performance considerations, constraints.
+
+    - file: glrpp-metaprogramming-basics.md
+      describes: >
+        Introduction to template metaprogramming as used in GLR++:
+        traits, constexpr utilities, and compile-time computation.
+
+    - file: glrpp-metaprogramming-guide.md
+      describes: >
+        Comprehensive guide to GLR++ metaprogramming internals:
+        template structures, expression trees, partial specialization.
+
+    - file: glrpp-advanced-metaprogramming.md
+      describes: >
+        Deep, expert-level metaprogramming topics:
+        optimization, compile-time reflection,
+        type-level grammar manipulation.
+
+    - file: glrpp-debugging-grammars.md
+      describes: >
+        Techniques for debugging grammars:
+        tracing reductions, conflict inspection,
+        visualizing parse forests.
+
+    - file: glrpp-scannerless-parser.md
+      describes: >
+        How to construct scannerless parsers in GLR++,
+        benefits, pitfalls, and real-world scenarios.
+
+    - file: glrpp-explaining-files.md
+      describes: >
+        How GLR++ explains what it parsed: file-level diagnostics,
+        annotated source, clarity tools.
+
+    - file: glrpp-explaining-rules.md
+      describes: >
+        Rule-level explanations, trace output,
+        visualization of rule application.
+
+    - file: glrpp-repprting-errors.md
+      describes: >
+        Error reporting infrastructure, custom error handlers,
+        structured diagnostics, recovery strategies.
+
+    - file: glrpp-case-study-sql.md
+      describes: >
+        Full SQL-like grammar implementation,
+        challenges, disambiguation, semantic processing.
+
+    - file: glrpp-case-study-yaml.md
+      describes: >
+        Building a YAML-like parser: indentation-sensitivity,
+        scannerless aspects, ambiguity handling.
+
+    - file: glrpp-case-study-syntax-highlighting.md
+      describes: >
+        Using GLR++ for syntax highlighting:
+        extracting regions, lexical grammars, layering passes.
+
+    - file: glrpp-case-study-semgrep.md
+      describes: >
+        Implementing a Semgrep-like structural matcher using GLR++,
+        pattern grammars, matching strategies.
+
+    - file: glrpp-case-study.md
+      optional: true
+      describes: >
+        General case study placeholder if needed.
+
+    - file: glrpp-list-of-data-structures.md
+      describes: >
+        Complete reference of internal data structures:
+        GSS nodes, parse forest node types,
+        symbol tables, caches.

@@ -13,6 +13,7 @@
 #include <vector>
 
 #include <glrpp/dsl/actions.hpp>
+#include <glrpp/dsl/ast.hpp>
 #include <glrpp/dsl/symbol.hpp>
 
 namespace glrpp::dsl {

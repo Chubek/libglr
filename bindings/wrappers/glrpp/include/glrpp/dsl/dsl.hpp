@@ -12,6 +12,7 @@
 #include <glrpp/dsl/scanner.hpp>
 #include <glrpp/dsl/symbol.hpp>
 #include <glrpp/dsl/token.hpp>
+#include <glrpp/meta/pipeline.hpp>
 
 namespace glrpp {
 using dsl::alt;

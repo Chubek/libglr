@@ -7,4 +7,5 @@
 
 #include <glrpp/meta/brigand.hpp>
 #include <glrpp/meta/ctre.hpp>
+#include <glrpp/meta/pipeline.hpp>
 #include <glrpp/meta/reflect.hpp>
