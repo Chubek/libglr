@@ -13,6 +13,16 @@ option(BUILD_DISAMBSTD "Build the standard disambiguation library" ON)
 option(BUILD_REWRITELIB "Install the standard rewrite library" ON)
 option(BUILD_SWIG_BINDINGS "Build SWIG bindings when SWIG is available" OFF)
 option(ENABLE_TEST_SANITIZERS "Enable address/undefined sanitizers for tests" OFF)
+option(BUILD_SHAREDLIB "Build libglr as a shared library" OFF)
+option(INSTALL_LOCAL "Install libglr into ~/.local instead of /usr/local" OFF)
+
+if(INSTALL_LOCAL)
+    if(DEFINED ENV{HOME} AND NOT "$ENV{HOME}" STREQUAL "")
+        set(CMAKE_INSTALL_PREFIX "$ENV{HOME}/.local" CACHE PATH "Install prefix" FORCE)
+    else()
+        message(FATAL_ERROR "INSTALL_LOCAL=ON requires the HOME environment variable to be set.")
+    endif()
+endif()
 
 # Bundle the local S-expression parser used by the rewrite subsystem.
 file(GLOB SFSEXP_SOURCES CONFIGURE_DEPENDS
@@ -49,7 +59,11 @@ set(GLR_SOURCES
 )
 
 # Create library
-add_library(${PROJECT_NAME} STATIC ${GLR_SOURCES})
+set(GLR_LIBRARY_KIND STATIC)
+if(BUILD_SHAREDLIB)
+    set(GLR_LIBRARY_KIND SHARED)
+endif()
+add_library(${PROJECT_NAME} ${GLR_LIBRARY_KIND} ${GLR_SOURCES})
 
 # Set include directories
 target_include_directories(${PROJECT_NAME}
@@ -80,6 +94,10 @@ install(TARGETS ${PROJECT_NAME}
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+if(INSTALL_LOCAL)
+    install(CODE "file(MAKE_DIRECTORY \"$ENV{HOME}/.local/lib\")")
+endif()
 
 install(FILES
     include/glr/glr.h

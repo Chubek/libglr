@@ -4,6 +4,23 @@ build_tests = get_option('build_tests')
 build_examples = get_option('build_examples')
 build_disambstd = get_option('build_disambstd')
 build_rewritelib = get_option('build_rewritelib')
+build_sharedlib = get_option('build_sharedlib')
+install_local = get_option('install_local')
+
+if install_local
+  home_dir = run_command('sh', '-c', 'printf %s "$HOME"', check: true).stdout().strip()
+  if home_dir == ''
+    error('install_local=true requires the HOME environment variable to be set')
+  endif
+  local_prefix = join_paths(home_dir, '.local')
+  lib_install_dir = join_paths(local_prefix, get_option('libdir'))
+  include_install_dir = join_paths(local_prefix, get_option('includedir'))
+  data_install_dir = join_paths(local_prefix, get_option('datadir'))
+else
+  lib_install_dir = get_option('libdir')
+  include_install_dir = get_option('includedir')
+  data_install_dir = get_option('datadir')
+endif
 
 inc = include_directories('include', 'third_party/sfsexp/src')
 
@@ -22,25 +39,42 @@ sfsexp = static_library(
   ),
   include_directories: inc,
   install: true,
+  install_dir: lib_install_dir,
 )
 
-libglr = static_library(
-  'glr',
-  files(
-    'src/glr/disambiguate.c',
-    'src/glr/forest.c',
-    'src/glr/fork.c',
-    'src/glr/grammar.c',
-    'src/glr/graph.c',
-    'src/glr/parser.c',
-    'src/glr/reduction.c',
-    'src/glr/rewrite.c',
-    'src/glr/stack.c',
-  ),
-  include_directories: inc,
-  link_with: sfsexp,
-  install: true,
+glr_sources = files(
+  'src/glr/disambiguate.c',
+  'src/glr/forest.c',
+  'src/glr/fork.c',
+  'src/glr/grammar.c',
+  'src/glr/graph.c',
+  'src/glr/lexer-hooks.c',
+  'src/glr/parser.c',
+  'src/glr/reader.c',
+  'src/glr/reduction.c',
+  'src/glr/rewrite.c',
+  'src/glr/stack.c',
 )
+
+if build_sharedlib
+  libglr = shared_library(
+    'glr',
+    glr_sources,
+    include_directories: inc,
+    link_with: sfsexp,
+    install: true,
+    install_dir: lib_install_dir,
+  )
+else
+  libglr = static_library(
+    'glr',
+    glr_sources,
+    include_directories: inc,
+    link_with: sfsexp,
+    install: true,
+    install_dir: lib_install_dir,
+  )
+endif
 
 install_headers(
   'include/glr/disambiguate.h',
@@ -49,11 +83,13 @@ install_headers(
   'include/glr/glr.h',
   'include/glr/grammar.h',
   'include/glr/graph.h',
+  'include/glr/lexer-hooks.h',
   'include/glr/parser.h',
+  'include/glr/reader.h',
   'include/glr/reduction.h',
   'include/glr/rewrite.h',
   'include/glr/stack.h',
-  subdir: 'glr',
+  install_dir: join_paths(include_install_dir, 'glr'),
 )
 
 if build_tests
@@ -80,6 +116,7 @@ if build_disambstd
     include_directories: inc,
     link_with: libglr,
     install: true,
+    install_dir: lib_install_dir,
   )
 endif
 
@@ -92,6 +129,6 @@ if build_rewritelib
     'rewritelib/make-lr-compat.grl',
     'rewritelib/remove-left-recursion.grl',
     'rewritelib/remove-unit-productions.grl',
-    install_dir: join_paths(get_option('datadir'), 'libglr', 'rewritelib'),
+    install_dir: join_paths(data_install_dir, 'libglr', 'rewritelib'),
   )
 endif
