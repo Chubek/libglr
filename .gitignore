@@ -225,3 +225,5 @@ _bindings_
 # Python
 __pycache__/
 *.pyc
+
+files_manifest.json
