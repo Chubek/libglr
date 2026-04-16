@@ -34,6 +34,9 @@ target_include_directories(sfsexp
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/sfsexp/src>
         $<INSTALL_INTERFACE:include/libglr/third_party/sfsexp>)
 target_compile_options(sfsexp PRIVATE -w)
+set_target_properties(sfsexp PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+)
 install(TARGETS sfsexp
     EXPORT ${PROJECT_NAME}-exports
     ARCHIVE DESTINATION lib
@@ -64,6 +67,9 @@ if(BUILD_SHAREDLIB)
     set(GLR_LIBRARY_KIND SHARED)
 endif()
 add_library(${PROJECT_NAME} ${GLR_LIBRARY_KIND} ${GLR_SOURCES})
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+)
 
 # Set include directories
 target_include_directories(${PROJECT_NAME}
