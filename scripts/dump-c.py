@@ -2,12 +2,13 @@
 """
 C Source Code Documentation Generator using pycparser
 
-Generates a plaintext file documenting C source files with:
-- File contents
-- Dependencies (includes)
-- Declared/defined structures, functions, typedefs, enums
-- Optional AST S-expression representation
-- Optional interface/implementation pairing
+Generates a Structured Dump File (SDF) documenting C source files with:
+- File and directory information
+- Dependency graph between files
+- Literal contents of the files
+- Summary of the files
+- S-Expression of header files
+- S-Expression of implementation files
 """
 
 import argparse
@@ -105,6 +106,7 @@ class CFileAnalyzer(c_ast.NodeVisitor):
 
 
 def extract_includes(filepath):
+    """Extract #include directives from a file"""
     includes = []
     try:
         with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
@@ -118,6 +120,7 @@ def extract_includes(filepath):
 
 
 def ast_to_sexp(node, indent=0):
+    """Convert AST node to S-expression format"""
     if node is None:
         return "nil"
 
@@ -147,21 +150,57 @@ def ast_to_sexp(node, indent=0):
     return result
 
 
-def code_block(language, source, content):
-    """Format a plaintext code block"""
-    src_attr = f"source={source}" if source else "source="
-    lines = [
-        f"== Code[language={language}, {src_attr}]",
-        "<BeginCode>",
-        content,
-        "<EndCode>",
-    ]
-    return "\n".join(lines)
+def find_fake_libc_headers(script_dir, env_var, cli_arg):
+    """Find fake_libc_include directory with fallback hierarchy"""
+    # 1. Check script directory
+    local_path = script_dir / 'fake_libc_include'
+    if local_path.is_dir():
+        return str(local_path)
+    
+    # 2. Check environment variable
+    if env_var and Path(env_var).is_dir():
+        return env_var
+    
+    # 3. Check CLI argument
+    if cli_arg and Path(cli_arg).is_dir():
+        return cli_arg
+    
+    return None
 
 
-def analyze_c_file(filepath, cpp_args=None):
+def build_cpp_args(fake_libc_path, headers_path, intf_dir, extra_args, use_real_libc):
+    """Build preprocessor arguments list"""
+    args = []
+    
+    # Add fake libc headers unless using real ones
+    if not use_real_libc and fake_libc_path:
+        args.append(f'-I{fake_libc_path}')
+    
+    # Add custom header paths from environment variable
+    if headers_path:
+        for path in headers_path.split(':'):
+            path = path.strip()
+            if path:
+                args.append(f'-I{path}')
+    
+    # Add interface directory if specified
+    if intf_dir:
+        args.append(f'-I{intf_dir}')
+    
+    # Add user-provided extra arguments
+    if extra_args:
+        if isinstance(extra_args, str):
+            args.extend(extra_args.split())
+        else:
+            args.extend(extra_args)
+    
+    return args
+
+
+def analyze_c_file(filepath, cpp_path, cpp_args, pedantic=False):
+    """Analyze a C file and extract AST and declarations"""
     try:
-        ast = parse_file(filepath, use_cpp=True, cpp_args=cpp_args or ['-E'])
+        ast = parse_file(filepath, use_cpp=True, cpp_path=cpp_path, cpp_args=cpp_args)
         analyzer = CFileAnalyzer()
         analyzer.visit(ast)
         includes = extract_includes(filepath)
@@ -172,17 +211,41 @@ def analyze_c_file(filepath, cpp_args=None):
             'typedefs': analyzer.typedefs,
             'enums': analyzer.enums,
             'variables': analyzer.variables,
-            'includes': includes
+            'includes': includes,
+            'error': None
         }
     except ParseError as e:
+        if pedantic:
+            raise
         print(f"Parse error in {filepath}: {e}", file=sys.stderr)
-        return None
+        return {
+            'ast': None,
+            'functions': [],
+            'structs': [],
+            'typedefs': [],
+            'enums': [],
+            'variables': [],
+            'includes': extract_includes(filepath),
+            'error': str(e)
+        }
     except Exception as e:
+        if pedantic:
+            raise
         print(f"Error analyzing {filepath}: {e}", file=sys.stderr)
-        return None
+        return {
+            'ast': None,
+            'functions': [],
+            'structs': [],
+            'typedefs': [],
+            'enums': [],
+            'variables': [],
+            'includes': extract_includes(filepath),
+            'error': str(e)
+        }
 
 
 def match_interface_implementation(intf_files, impl_files):
+    """Match interface files with implementation files by basename"""
     pairs = []
     unmatched_intf = []
     unmatched_impl = list(impl_files)
@@ -203,104 +266,169 @@ def match_interface_implementation(intf_files, impl_files):
     return pairs, unmatched_intf, unmatched_impl
 
 
-def generate_plaintext_block(filepath, analysis, show_ast=False):
-    out = []
-    filename = os.path.basename(filepath)
+def write_sdf_header(out, files_info):
+    """Write file and directory information section"""
+    out.write("=" * 80 + "\n")
+    out.write("STRUCTURED DUMP FILE (SDF)\n")
+    out.write("=" * 80 + "\n\n")
+    
+    out.write("[FILE AND DIRECTORY INFORMATION]\n\n")
+    for info in files_info:
+        out.write(f"File: {info['path']}\n")
+        out.write(f"  Type: {info['type']}\n")
+        out.write(f"  Size: {info['size']} bytes\n")
+        if info.get('pair'):
+            out.write(f"  Paired with: {info['pair']}\n")
+        out.write("\n")
 
-    out.append("=" * 60)
-    out.append(f"FILE: {filename}")
-    out.append(f"PATH: {filepath}")
-    out.append("=" * 60)
 
-    # Dependencies
-    if analysis['includes']:
-        out.append("\n-- Dependencies --")
-        for inc in analysis['includes']:
-            out.append(f"  {inc}")
+def write_dependency_graph(out, all_analyses):
+    """Write dependency graph section"""
+    out.write("\n" + "=" * 80 + "\n")
+    out.write("[DEPENDENCY GRAPH]\n\n")
+    
+    for filepath, analysis in all_analyses.items():
+        if analysis['includes']:
+            out.write(f"{filepath}:\n")
+            for inc in analysis['includes']:
+                out.write(f"  -> {inc}\n")
+            out.write("\n")
 
-    # Structures
-    if analysis['structs']:
-        out.append("\n-- Structures --")
-        for struct in analysis['structs']:
-            out.append(f"\n  {struct['name']}  (at {struct['coord']})")
-            out.append(code_block("C", filepath, struct['definition']))
 
-    # Enums
-    if analysis['enums']:
-        out.append("\n-- Enumerations --")
-        for enum in analysis['enums']:
-            out.append(f"\n  {enum['name']}  (at {enum['coord']})")
-            out.append(code_block("C", filepath, enum['definition']))
+def write_file_contents(out, files):
+    """Write literal contents of files section"""
+    out.write("\n" + "=" * 80 + "\n")
+    out.write("[LITERAL FILE CONTENTS]\n\n")
+    
+    for filepath in files:
+        out.write(f"--- {filepath} ---\n")
+        try:
+            with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                out.write(f.read())
+        except Exception as e:
+            out.write(f"// Error reading file: {e}\n")
+        out.write("\n\n")
 
-    # Typedefs
-    if analysis['typedefs']:
-        out.append("\n-- Type Definitions --")
-        for typedef in analysis['typedefs']:
-            out.append(f"\n  {typedef['name']}  (at {typedef['coord']})")
-            out.append(code_block("C", filepath, typedef['definition']))
 
-    # Functions
-    if analysis['functions']:
-        out.append("\n-- Functions --")
-        for func in analysis['functions']:
-            out.append(f"\n  {func['name']}  [{func['type']}]  (at {func['coord']})")
-            out.append(code_block("C", filepath, func['signature']))
+def write_summary(out, all_analyses):
+    """Write summary section"""
+    out.write("\n" + "=" * 80 + "\n")
+    out.write("[SUMMARY]\n\n")
+    
+    for filepath, analysis in all_analyses.items():
+        out.write(f"File: {filepath}\n")
+        
+        if analysis['error']:
+            out.write(f"  ERROR: {analysis['error']}\n\n")
+            continue
+        
+        out.write(f"  Functions: {len(analysis['functions'])}\n")
+        if analysis['functions']:
+            for func in analysis['functions']:
+                out.write(f"    - {func['name']} [{func['type']}]\n")
+        
+        out.write(f"  Structures: {len(analysis['structs'])}\n")
+        if analysis['structs']:
+            for struct in analysis['structs']:
+                out.write(f"    - {struct['name']}\n")
+        
+        out.write(f"  Typedefs: {len(analysis['typedefs'])}\n")
+        if analysis['typedefs']:
+            for typedef in analysis['typedefs']:
+                out.write(f"    - {typedef['name']}\n")
+        
+        out.write(f"  Enumerations: {len(analysis['enums'])}\n")
+        if analysis['enums']:
+            for enum in analysis['enums']:
+                out.write(f"    - {enum['name']}\n")
+        
+        out.write(f"  Global Variables: {len(analysis['variables'])}\n")
+        if analysis['variables']:
+            for var in analysis['variables']:
+                out.write(f"    - {var['name']}\n")
+        
+        out.write("\n")
 
-    # Variables
-    if analysis['variables']:
-        out.append("\n-- Global Variables --")
-        for var in analysis['variables']:
-            out.append(f"  {var['name']}  (at {var['coord']})")
-            out.append(code_block("C", filepath, var['declaration']))
 
-    # Source code
-    out.append("\n-- Source Code --")
-    try:
-        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
-            source = f.read()
-    except Exception as e:
-        source = f"// Error reading file: {e}"
-    out.append(code_block("C", filepath, source))
-
-    # AST
-    if show_ast and analysis['ast']:
-        out.append("\n-- Abstract Syntax Tree (S-Expression) --")
-        out.append(code_block("Lisp", "", ast_to_sexp(analysis['ast'])))
-
-    out.append("\n")
-    return "\n".join(out)
+def write_sexp_section(out, title, files_analyses):
+    """Write S-expression section for a group of files"""
+    out.write("\n" + "=" * 80 + "\n")
+    out.write(f"[{title}]\n\n")
+    
+    for filepath, analysis in files_analyses.items():
+        if analysis['ast']:
+            out.write(f"Source: {filepath}\n")
+            out.write("=" * 5 + "\n")
+            out.write(ast_to_sexp(analysis['ast']))
+            out.write("\n" + "=" * 5 + "\n\n")
+        else:
+            out.write(f"Source: {filepath}\n")
+            out.write("=" * 5 + "\n")
+            out.write(f"ERROR: Could not parse file\n")
+            if analysis['error']:
+                out.write(f"Details: {analysis['error']}\n")
+            out.write("=" * 5 + "\n\n")
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Generate plaintext documentation from C source files using pycparser'
+        description='Generate Structured Dump File (SDF) from C source files using pycparser'
     )
     parser.add_argument('files', nargs='*', help='C source files to document')
-    parser.add_argument('-o', '--output', default='documentation.txt',
-                        help='Output file (default: documentation.txt)')
-    parser.add_argument('--show-ast', action='store_true',
-                        help='Include AST S-expression in output')
+    parser.add_argument('-o', '--output', default='dump.sdf',
+                        help='Output file (default: dump.sdf)')
     parser.add_argument('--intf-dir', help='Interface directory (e.g., include/)')
     parser.add_argument('--impl-dir', help='Implementation directory (e.g., src/)')
     parser.add_argument('--cpp-args', help='Additional arguments for C preprocessor')
+    parser.add_argument('--cpp-cmd', help='Preprocessor command (default: cpp)')
+    parser.add_argument('--fake-libc-headers', help='Path to fake_libc_include directory')
+    parser.add_argument('--use-real-libc-headers', action='store_true',
+                        help='Use real libc headers instead of fake ones')
+    parser.add_argument('--pedantic', action='store_true',
+                        help='Stop on errors instead of ignoring them')
 
     args = parser.parse_args()
 
-    cpp_args = ['-E']
-    if args.cpp_args:
-        cpp_args.extend(args.cpp_args.split())
+    # Determine script directory
+    script_dir = Path(__file__).parent.resolve()
+
+    # Find fake_libc_include directory
+    fake_libc_env = os.environ.get('DUMPC_FAKE_LIBC_HEADERS')
+    fake_libc_path = find_fake_libc_headers(script_dir, fake_libc_env, args.fake_libc_headers)
+    
+    if not args.use_real_libc_headers and not fake_libc_path:
+        print("Warning: fake_libc_include not found. Parsing may fail on system headers.", file=sys.stderr)
+        print("  Searched in:", file=sys.stderr)
+        print(f"    1. {script_dir / 'fake_libc_include'}", file=sys.stderr)
+        if fake_libc_env:
+            print(f"    2. $DUMPC_FAKE_LIBC_HEADERS: {fake_libc_env}", file=sys.stderr)
+        if args.fake_libc_headers:
+            print(f"    3. --fake-libc-headers: {args.fake_libc_headers}", file=sys.stderr)
+        print("  Use --use-real-libc-headers to suppress this warning.", file=sys.stderr)
+
+    # Get custom header paths
+    headers_path = os.environ.get('DUMPC_HEADERS_PATH')
+
+    # Determine preprocessor command
+    cpp_cmd = args.cpp_cmd or os.environ.get('DUMPC_CPP_CMD', 'cpp')
+
+    # Build preprocessor arguments
+    cpp_args = build_cpp_args(
+        fake_libc_path,
+        headers_path,
+        args.intf_dir,
+        args.cpp_args,
+        args.use_real_libc_headers
+    )
 
     all_files = []
-    if args.files:
-        for pattern in args.files:
-            path = Path(pattern)
-            if path.is_file():
-                all_files.append(str(path))
-            elif path.is_dir():
-                all_files.extend([str(f) for f in path.rglob('*.c')])
-                all_files.extend([str(f) for f in path.rglob('*.h')])
+    files_info = []
+    all_analyses = {}
+    header_analyses = {}
+    impl_analyses = {}
 
     if args.intf_dir and args.impl_dir:
+        # Interface/Implementation pairing mode
         intf_files = list(Path(args.intf_dir).rglob('*.h'))
         impl_files = list(Path(args.impl_dir).rglob('*.c'))
 
@@ -309,54 +437,83 @@ def main():
             [str(f) for f in impl_files]
         )
 
-        with open(args.output, 'w', encoding='utf-8') as out:
-            out.write("C SOURCE CODE DOCUMENTATION\n")
-            out.write("Generated from interface/implementation pairs\n\n")
+        # Process pairs
+        for intf, impl in pairs:
+            all_files.extend([intf, impl])
+            files_info.append({
+                'path': intf,
+                'type': 'interface',
+                'size': Path(intf).stat().st_size,
+                'pair': impl
+            })
+            files_info.append({
+                'path': impl,
+                'type': 'implementation',
+                'size': Path(impl).stat().st_size,
+                'pair': intf
+            })
 
-            if pairs:
-                out.write("*** Interface/Implementation Pairs ***\n\n")
-                for intf, impl in pairs:
-                    out.write(f"  Pair: {Path(intf).name} <-> {Path(impl).name}\n\n")
+            print(f"Processing pair: {Path(intf).name} <-> {Path(impl).name}", file=sys.stderr)
+            
+            intf_analysis = analyze_c_file(intf, cpp_cmd, cpp_args, args.pedantic)
+            impl_analysis = analyze_c_file(impl, cpp_cmd, cpp_args, args.pedantic)
+            
+            all_analyses[intf] = intf_analysis
+            all_analyses[impl] = impl_analysis
+            header_analyses[intf] = intf_analysis
+            impl_analyses[impl] = impl_analysis
 
-                    out.write(f"  [Interface: {Path(intf).name}]\n")
-                    analysis = analyze_c_file(intf, cpp_args)
-                    if analysis:
-                        out.write(generate_plaintext_block(intf, analysis, args.show_ast))
+        # Process unmatched files (ignored but marked)
+        for intf in unmatched_intf:
+            print(f"Warning: Unmatched interface file (ignored): {intf}", file=sys.stderr)
+        
+        for impl in unmatched_impl:
+            print(f"Warning: Unmatched implementation file (ignored): {impl}", file=sys.stderr)
 
-                    out.write(f"  [Implementation: {Path(impl).name}]\n")
-                    analysis = analyze_c_file(impl, cpp_args)
-                    if analysis:
-                        out.write(generate_plaintext_block(impl, analysis, args.show_ast))
+    elif args.files:
+        # Individual files mode
+        for pattern in args.files:
+            path = Path(pattern)
+            if path.is_file():
+                all_files.append(str(path))
+            elif path.is_dir():
+                all_files.extend([str(f) for f in path.rglob('*.c')])
+                all_files.extend([str(f) for f in path.rglob('*.h')])
 
-            if unmatched_intf:
-                out.write("*** Unmatched Interface Files ***\n\n")
-                for intf in unmatched_intf:
-                    analysis = analyze_c_file(intf, cpp_args)
-                    if analysis:
-                        out.write(generate_plaintext_block(intf, analysis, args.show_ast))
+        for filepath in all_files:
+            file_type = 'header' if filepath.endswith('.h') else 'implementation'
+            files_info.append({
+                'path': filepath,
+                'type': file_type,
+                'size': Path(filepath).stat().st_size
+            })
 
-            if unmatched_impl:
-                out.write("*** Unmatched Implementation Files ***\n\n")
-                for impl in unmatched_impl:
-                    analysis = analyze_c_file(impl, cpp_args)
-                    if analysis:
-                        out.write(generate_plaintext_block(impl, analysis, args.show_ast))
-
-    elif all_files:
-        with open(args.output, 'w', encoding='utf-8') as out:
-            out.write("C SOURCE CODE DOCUMENTATION\n")
-            out.write(f"Generated from {len(all_files)} file(s)\n\n")
-
-            for filepath in all_files:
-                print(f"Processing {filepath}...", file=sys.stderr)
-                analysis = analyze_c_file(filepath, cpp_args)
-                if analysis:
-                    out.write(generate_plaintext_block(filepath, analysis, args.show_ast))
+            print(f"Processing {filepath}...", file=sys.stderr)
+            analysis = analyze_c_file(filepath, cpp_cmd, cpp_args, args.pedantic)
+            all_analyses[filepath] = analysis
+            
+            if file_type == 'header':
+                header_analyses[filepath] = analysis
+            else:
+                impl_analyses[filepath] = analysis
     else:
         print("No files specified. Use files argument or --intf-dir/--impl-dir", file=sys.stderr)
         return 1
 
-    print(f"Documentation written to {args.output}")
+    # Write SDF file
+    with open(args.output, 'w', encoding='utf-8') as out:
+        write_sdf_header(out, files_info)
+        write_dependency_graph(out, all_analyses)
+        write_file_contents(out, all_files)
+        write_summary(out, all_analyses)
+        
+        if header_analyses:
+            write_sexp_section(out, "S-EXPRESSION OF HEADER FILES", header_analyses)
+        
+        if impl_analyses:
+            write_sexp_section(out, "S-EXPRESSION OF IMPLEMENTATION FILES", impl_analyses)
+
+    print(f"Structured dump written to {args.output}")
     return 0
 
 
