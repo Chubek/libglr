@@ -1,0 +1,5 @@
+# Example: disable diagrams locally
+HAVE_DOT = NO
+
+# Example: custom output path
+OUTPUT_DIRECTORY = ./local-docs

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doxygenlayout version="1.0">
+
+  <navindex>
+    <tab type="mainpage" visible="yes" title="Overview"/>
+    <tab type="namespaces" visible="yes" title="Namespaces"/>
+    <tab type="classes" visible="yes" title="Classes"/>
+    <tab type="files" visible="yes" title="Files"/>
+    <tab type="pages" visible="yes" title="Guides"/>
+  </navindex>
+
+  <class>
+    <briefdescription visible="yes"/>
+    <detaileddescription visible="yes"/>
+    <memberdecl>
+      <publictypes visible="yes"/>
+      <publicmethods visible="yes"/>
+      <protectedmethods visible="yes"/>
+      <privatemethods visible="yes"/>
+    </memberdecl>
+  </class>
+
+</doxygenlayout>
