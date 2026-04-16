@@ -1,0 +1,8 @@
+option('BUILD_DEP',        type: 'boolean', value: false, description: 'Build Debian package')
+option('BUILD_RPM',        type: 'boolean', value: false, description: 'Build RPM package')
+option('BUILD_TARBALL',    type: 'boolean', value: false, description: 'Build tarball archive')
+option('BUILD_ZLIB',       type: 'boolean', value: false, description: 'Build zip archive')
+option('BUILD_DOCS',       type: 'boolean', value: false, description: 'Build documentation')
+option('TARGET_MANPAGES',  type: 'boolean', value: false, description: 'Build manpages')
+option('GLRPP_BUILD_BINDINGS', type: 'boolean', value: true, description: 'Build SWIG glrpp bindings')
+option('GLRPP_INSTALL',    type: 'boolean', value: true, description: 'Install glrpp headers and metadata')
