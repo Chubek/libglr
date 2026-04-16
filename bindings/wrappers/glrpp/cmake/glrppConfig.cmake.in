@@ -1,0 +1,12 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+if(NOT TARGET ltdl AND NOT TARGET ltdl::ltdl)
+  find_package(ltdl CONFIG QUIET)
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/glrppTargets.cmake")
+
+set(glrpp_LIBGLR_ENVVAR "LIBGLR_SHAREDLIB")
+set(glrpp_LIBGLR_FALLBACK_DIRS "/lib" "/usr/lib" "/usr/local/lib" "$ENV{HOME}/.local/lib")

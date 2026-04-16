@@ -1,208 +1,183 @@
 cmake_minimum_required(VERSION 3.20)
 project(glrpp VERSION 0.1.0 LANGUAGES C CXX)
 
-# -------------------------------------------------------
-# Build options
-# -------------------------------------------------------
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
 option(BUILD_DEP "Build Debian package" OFF)
 option(BUILD_RPM "Build RPM package" OFF)
 option(BUILD_TARBALL "Build tarball archive" OFF)
 option(BUILD_ZLIB "Build .zip archive" OFF)
 option(BUILD_DOCS "Build documentation" OFF)
 option(TARGET_MANPAGES "Build manpages" OFF)
-option(GLRPP_BUILD_BINDINGS "Build SWIG C++ bindings" ON)
-option(GLRPP_INSTALL "Install glrpp headers and bindings" ON)
+option(GLRPP_INSTALL "Install glrpp headers and metadata" ON)
+option(GLRPP_INSTALL_BUNDLED_LIBLTDL "Install the bundled libltdl helper library" ON)
 
-# -------------------------------------------------------
-# Global configuration
-# -------------------------------------------------------
+set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-include(GNUInstallDirs)
 
-# Python helper scripts
-set(GLRPP_ARCHIVER_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/glrpp/scripts/archive-services.py")
-set(GLRPP_DOCSTRING_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/glrpp/scripts/docstring-services.py")
+find_package(Python3 COMPONENTS Interpreter)
 
-# -------------------------------------------------------
-# Header-only target
-# -------------------------------------------------------
+set(GLRPP_ARCHIVER_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/scripts/archive-services.py")
+set(GLRPP_DOCSTRING_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/scripts/docstring-services.py")
+set(GLRPP_INCLUDE_DIRS
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/brigand/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/compile-time-regular-expressions/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/frozen/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/libltdl
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/libltdl/libltdl
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/magic_enum/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/nameof/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/pfr/include)
+
 add_subdirectory(third_party/libltdl EXCLUDE_FROM_ALL)
 
 add_library(glrpp INTERFACE)
+add_library(glrpp::glrpp ALIAS glrpp)
 target_include_directories(glrpp INTERFACE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/brigand/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ctre/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/frozen/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/libltdl
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/magic_enum/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/nameof/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/pfr/include
-)
-target_link_libraries(glrpp INTERFACE ltdl)
+    $<BUILD_INTERFACE:${GLRPP_INCLUDE_DIRS}>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+target_link_libraries(glrpp INTERFACE
+    $<BUILD_INTERFACE:ltdl>
+    $<INSTALL_INTERFACE:ltdl>)
 
-# -------------------------------------------------------
-# SWIG Bindings
-# -------------------------------------------------------
-if(GLRPP_BUILD_BINDINGS)
-    add_subdirectory(bindings)
+if(CMAKE_DL_LIBS)
+    target_link_libraries(glrpp INTERFACE $<INSTALL_INTERFACE:${CMAKE_DL_LIBS}>)
 endif()
 
-# -------------------------------------------------------
-# Installation (headers + targets + CMake package files)
-# -------------------------------------------------------
 if(GLRPP_INSTALL)
-
     install(
         DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/glrpp
-        DESTINATION include
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     )
 
     install(
-        DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/third_party/
-        DESTINATION include/glrpp/third_party/
+        DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/third_party/brigand/include/brigand
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     )
-
-    set(GLRPP_CMAKE_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/glrpp")
-
+    install(
+        DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/third_party/compile-time-regular-expressions/include/ctre
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+    install(
+        DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/third_party/frozen/include/frozen
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+    install(
+        DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/third_party/libltdl/libltdl
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+    install(
+        FILES ${CMAKE_CURRENT_SOURCE_DIR}/third_party/libltdl/ltdl.h
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
     install(
         FILES
-            cmake/glrppConfig.cmake
-            cmake/glrppConfigVersion.cmake
-            cmake/glrppTargets.cmake
-        DESTINATION
-            ${GLRPP_CMAKE_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}/third_party/compile-time-regular-expressions/include/ctre.hpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/third_party/compile-time-regular-expressions/include/ctre-unicode.hpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/third_party/compile-time-regular-expressions/include/unicode-db.hpp
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+    install(
+        DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/third_party/magic_enum/include/magic_enum
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+    install(
+        DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/third_party/nameof/include/nameof
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+    install(
+        DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/third_party/pfr/include/boost
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+
+    install(TARGETS glrpp EXPORT glrppTargets)
+
+    write_basic_package_version_file(
+        "${CMAKE_CURRENT_BINARY_DIR}/glrppConfigVersion.cmake"
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY SameMajorVersion
+    )
+
+    configure_package_config_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/glrppConfig.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/glrppConfig.cmake"
+        INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/glrpp"
+    )
+
+    install(
+        EXPORT glrppTargets
+        FILE glrppTargets.cmake
+        NAMESPACE glrpp::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/glrpp
+    )
+    install(
+        FILES
+            "${CMAKE_CURRENT_BINARY_DIR}/glrppConfig.cmake"
+            "${CMAKE_CURRENT_BINARY_DIR}/glrppConfigVersion.cmake"
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/glrpp
+    )
+
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/glrpp.pc.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/glrpp.pc"
+        @ONLY
+    )
+    install(
+        FILES "${CMAKE_CURRENT_BINARY_DIR}/glrpp.pc"
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
     )
 endif()
 
-# =======================================================
-# Packaging Targets (deb / rpm / tarball / zlib)
-# =======================================================
-
-if(BUILD_DEP)
-    add_custom_target(deb
-        COMMAND ${CMAKE_COMMAND} -E echo "Building Debian package..."
-        COMMAND ${Python3_EXECUTABLE} ${GLRPP_ARCHIVER_SCRIPT} deb
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    )
-endif()
-
-if(BUILD_RPM)
-    add_custom_target(rpm
-        COMMAND ${CMAKE_COMMAND} -E echo "Building RPM package..."
-        COMMAND ${Python3_EXECUTABLE} ${GLRPP_ARCHIVER_SCRIPT} rpm
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    )
-endif()
-
-if(BUILD_TARBALL)
-    add_custom_target(tarball
-        COMMAND ${CMAKE_COMMAND} -E echo "Building tarball archive..."
-        COMMAND ${Python3_EXECUTABLE} ${GLRPP_ARCHIVER_SCRIPT} tarball
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    )
-endif()
-
-if(BUILD_ZLIB)
-    add_custom_target(zlib
-        COMMAND ${CMAKE_COMMAND} -E echo "Building zip archive..."
-        COMMAND ${Python3_EXECUTABLE} ${GLRPP_ARCHIVER_SCRIPT} zlib
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    )
-endif()
-
-# =======================================================
-# Documentation targets (html/pdf/latex/singlehtml)
-# =======================================================
-
-if(BUILD_DOCS)
-
-    # HTML documentation
+if(BUILD_DOCS AND Python3_Interpreter_FOUND)
     add_custom_target(html
         COMMAND ${Python3_EXECUTABLE} ${GLRPP_DOCSTRING_SCRIPT} html
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    )
-
-    # Single page HTML
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     add_custom_target(singlehtml
         COMMAND ${Python3_EXECUTABLE} ${GLRPP_DOCSTRING_SCRIPT} singlehtml
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    )
-
-    # PDF documentation
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     add_custom_target(pdf
         COMMAND ${Python3_EXECUTABLE} ${GLRPP_DOCSTRING_SCRIPT} pdf
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    )
-
-    # LaTeX documentation
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     add_custom_target(latex
         COMMAND ${Python3_EXECUTABLE} ${GLRPP_DOCSTRING_SCRIPT} latex
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    )
-
-    # Install docs
-    add_custom_target(install-docs
-        COMMAND ${Python3_EXECUTABLE} ${GLRPP_DOCSTRING_SCRIPT} install
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    )
-
-    # Install docs with install target
-    install(CODE "
-        message(STATUS \"Installing documentation...\")
-        execute_process(
-            COMMAND ${Python3_EXECUTABLE} ${GLRPP_DOCSTRING_SCRIPT} install
-            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        )
-    ")
-
-    # Bundle docs into archives if GLRPP_BUNDLE_DOCS set
-    if(DEFINED ENV{GLRPP_BUNDLE_DOCS})
-        set(DOC_TYPE "$ENV{GLRPP_BUNDLE_DOCS}")
-        add_custom_target(bundle-docs
-            COMMAND ${CMAKE_COMMAND} -E echo \"Bundling documentation type: ${DOC_TYPE}\"
-            COMMAND ${Python3_EXECUTABLE} ${GLRPP_ARCHIVER_SCRIPT} bundle ${DOC_TYPE}
-            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        )
-    endif()
-
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 
-# ======================================================
-# Documentation
-# ======================================================
+if(BUILD_DEP AND Python3_Interpreter_FOUND)
+    add_custom_target(deb
+        COMMAND ${Python3_EXECUTABLE} ${GLRPP_ARCHIVER_SCRIPT} deb
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+endif()
 
-find_package(Doxygen REQUIRED)
+if(BUILD_RPM AND Python3_Interpreter_FOUND)
+    add_custom_target(rpm
+        COMMAND ${Python3_EXECUTABLE} ${GLRPP_ARCHIVER_SCRIPT} rpm
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+endif()
 
-set(DOXYGEN_IN ${CMAKE_SOURCE_DIR}/docs/Doxyfile.in)
-set(DOXYGEN_OUT ${CMAKE_BINARY_DIR}/Doxyfile)
+if(BUILD_TARBALL AND Python3_Interpreter_FOUND)
+    add_custom_target(tarball
+        COMMAND ${Python3_EXECUTABLE} ${GLRPP_ARCHIVER_SCRIPT} tarball
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+endif()
 
-configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
+if(BUILD_ZLIB AND Python3_Interpreter_FOUND)
+    add_custom_target(zlib
+        COMMAND ${Python3_EXECUTABLE} ${GLRPP_ARCHIVER_SCRIPT} zlib
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+endif()
 
-add_custom_target(doc
-    COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    COMMENT "Generating API documentation with Doxygen"
-    VERBATIM)
-
-# =======================================================
-# Manpage targets
-# =======================================================
-
-if(TARGET_MANPAGES)
-
-    add_custom_target(build-man
-        COMMAND ${CMAKE_COMMAND} -E echo "Building manpages..."
-        COMMAND nuroff ${CMAKE_SOURCE_DIR}/glrpp/man
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    )
-
-    add_custom_target(install-man
-        COMMAND ${CMAKE_COMMAND} -E echo "Installing manpages..."
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-                ${CMAKE_SOURCE_DIR}/glrpp/man
-                ${CMAKE_INSTALL_PREFIX}/share/man
-    )
-
+if(BUILD_DOCS)
+    find_package(Doxygen REQUIRED)
+    set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in)
+    set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
+    configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
+    add_custom_target(doc
+        COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        COMMENT "Generating API documentation with Doxygen"
+        VERBATIM)
 endif()

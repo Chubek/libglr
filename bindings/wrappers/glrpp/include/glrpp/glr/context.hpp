@@ -94,14 +94,18 @@ class context {
         throw std::runtime_error("glrpp: lt_dlinit failed");
       }
 
-      handle_ = lt_dlopenext("libglr");
-      if (handle_ == nullptr) {
-        handle_ = lt_dlopenext("glr");
+      for (const auto& candidate : glrpp::shared_library_candidates()) {
+        handle_ = open_candidate(candidate);
+        if (handle_ != nullptr) {
+          break;
+        }
       }
       if (handle_ == nullptr) {
         const char* error = lt_dlerror();
-        throw std::runtime_error(std::string("glrpp: failed to load libglr from shared library paths") +
-                                 (error ? std::string(": ") + error : std::string{}));
+        throw std::runtime_error(
+            std::string("glrpp: failed to load libglr.so; set LIBGLR_SHAREDLIB or place the library in "
+                        "LD_LIBRARY_PATH, /lib, /usr/lib, /usr/local/lib, or ~/.local/lib") +
+            (error ? std::string(": ") + error : std::string{}));
       }
 
       api_.grammar_create = load_symbol<runtime_api::grammar_create_fn>("glr_grammar_create");
@@ -139,6 +143,14 @@ class context {
                                (error ? std::string(" (") + error + ")" : std::string{}));
     }
     return reinterpret_cast<Fn>(symbol);
+  }
+
+  [[nodiscard]] static lt_dlhandle open_candidate(const std::string& candidate) {
+    lt_dlhandle handle = lt_dlopen(candidate.c_str());
+    if (handle != nullptr) {
+      return handle;
+    }
+    return lt_dlopenext(candidate.c_str());
   }
 
   std::string input_;
