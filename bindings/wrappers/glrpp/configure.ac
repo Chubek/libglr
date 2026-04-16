@@ -85,6 +85,8 @@ AS_IF([test "x$enable_bindings" = "xyes"], [
 # Output files
 # ------------------------------------------------------------
 
+AC_CONFIG_FILES([docs/Doxyfile])
+
 AC_CONFIG_FILES([
   Makefile
 ])
