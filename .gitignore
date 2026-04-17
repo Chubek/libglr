@@ -227,3 +227,5 @@ __pycache__/
 *.pyc
 
 files_manifest.json
+
+glrpp-booklet.md

@@ -68,14 +68,13 @@ done
 
 echo "Generated $BOOKLET_CONCAT"
 
-BOOKLET_TARGET_FORMAT="${BOOKLET_TARGET_FORMAT:-html}"
-BOOKLET_TARGET_FILE="${BOOKLET_TARGET_FILE:-glrpp-booklet.html}"
+BOOKLET_TARGET="${BOOKLET_TARGET:-glrpp.html}"
 
-if ! command -v pandoc >/dev/null 2>&1; then
-	echo "Pandoc not found, either not installed or not discoverable by the script"
+if ! command -v markdown >/dev/null 2>&1; then
+	echo "markdown(1) not found, either not installed or not discoverable by the script"
 	exit 1
 fi
 
-pandoc -f markdown -t "$BOOKLET_TARGET_FORMAT" -o "$BOOKLET_TARGET_FILE" "$BOOKLET_CONCAT"
+markdown "$BOOKLET_CONCAT" > "$BOOKLET_TARGET"
 
-echo "Compiled $BOOKLET_CONCAT to $BOOKLET_TARGET_FILE"
+echo "Compiled $BOOKLET_CONCAT to $BOOKLET_TARGET"
