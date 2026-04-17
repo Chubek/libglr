@@ -44,7 +44,7 @@ FILES=(
   booklet/glrpp-metaprogramming-guide.md
   booklet/glrpp-advanced-metaprogramming.md
   booklet/glrpp-debugging-grammars.md
-  booklet/glrpp-scannerless-parser.md
+  booklet/glrpp-scannerless-parser.mdi
   booklet/glrpp-explaining-files.md
   booklet/glrpp-explaining-rules.md
   booklet/glrpp-reporting-errors.md
@@ -66,15 +66,21 @@ for f in "${FILES[@]}"; do
     echo -e "\n\n" >> "$BOOKLET_CONCAT"
 done
 
-echo "Generated $BOOKLET_CONCAT"
+echo "Generated $BOOKLET_CONCAT by concatenating booklet chapters"
 
-BOOKLET_TARGET="${BOOKLET_TARGET:-glrpp.html}"
+BOOKLET_TARGET_FILE="${1:-~/glrpp-booklet.html}"
 
-if ! command -v markdown >/dev/null 2>&1; then
-	echo "markdown(1) not found, either not installed or not discoverable by the script"
+echo "$BOOKLET_TARGET_FILE was selected as the destination of HTML file"
+
+if ! command -v md2html >/dev/null 2>&1; then
+	echo "md2html(1) not found, please install it from the third_party/md4c directory"
 	exit 1
 fi
 
-markdown "$BOOKLET_CONCAT" > "$BOOKLET_TARGET"
+md2html --full-html --ftables --fcollapse-whitespace -o "$BOOKLET_TARGET_FILE" "$BOOKLET_CONCAT"
 
-echo "Compiled $BOOKLET_CONCAT to $BOOKLET_TARGET"
+echo "Compiled $BOOKLET_CONCAT to $BOOKLET_TARGET_FILE using md2html(1)"
+
+rm "$BOOKLET_CONCAT"
+
+echo "Artifacts removed"
