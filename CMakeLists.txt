@@ -123,7 +123,7 @@ install(FILES
 
 # Install documentation
 if(BUILD_DOCUMENTATION)
-    add_subdirectory(doc)
+    add_subdirectory(docs)
 endif()
 
 # Export targets
