@@ -57,6 +57,9 @@ case $host_os in
   *) glrpp_os_darwin=no; glrpp_os_windows=no; glrpp_os_unix=yes ;;
 esac
 
+AC_CHECK_PROGS([DOXYGEN], [doxygen])
+
+AM_CONDITIONAL([HAVE_DOXYGEN], [test -n "$DOXYGEN"])
 AM_CONDITIONAL([OS_UNIX], [test "x$glrpp_os_unix" = "xyes"])
 AM_CONDITIONAL([OS_DARWIN], [test "x$glrpp_os_darwin" = "xyes"])
 AM_CONDITIONAL([OS_WINDOWS], [test "x$glrpp_os_windows" = "xyes"])

@@ -1,0 +1,9 @@
+rule doxygen
+  command = doxygen $in
+  description = Generating Doxygen docs
+
+build docs/Doxyfile: configure docs/Doxyfile.in
+  # If you use a configure step; otherwise just use Doxyfile directly
+
+build docs: doxygen docs/Doxyfile
+  pool = console
