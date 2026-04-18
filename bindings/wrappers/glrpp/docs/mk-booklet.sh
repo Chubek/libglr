@@ -44,7 +44,6 @@ build_html() {
         "${output_dir}/glrpp-booklet.md" \
         --standalone \
         --toc \
-        --css "${script_dir}/doxygen-darkmode.css" \
         --metadata title="GLR++: A Comprehensive Guide" \
         -o "${output_dir}/glrpp-booklet.html"
 }

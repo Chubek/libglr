@@ -48,7 +48,6 @@ configure_file(
 set(GLRPP_DOCS_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in"
     "${CMAKE_CURRENT_SOURCE_DIR}/mainpage.md"
-    "${CMAKE_CURRENT_SOURCE_DIR}/doxygen-darkmode.css"
     "${CMAKE_CURRENT_SOURCE_DIR}/ltx-header.tex"
     "${CMAKE_CURRENT_SOURCE_DIR}/ltx-footer.tex"
     "${CMAKE_CURRENT_SOURCE_DIR}/booklet/Manifest.yaml"

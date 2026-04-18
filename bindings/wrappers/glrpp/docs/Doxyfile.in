@@ -1,6 +1,6 @@
 DOXYFILE_ENCODING      = UTF-8
-PROJECT_NAME           = "@GLRPP_PROJECT_NAME@"
-PROJECT_NUMBER         = "@GLRPP_PROJECT_VERSION@"
+PROJECT_NAME           = "libglr C++ Bindings"
+PROJECT_NUMBER         = "1.0.0"
 PROJECT_BRIEF          = "Header-only C++ wrapper for libglr"
 OUTPUT_DIRECTORY       = "@GLRPP_DOCS_OUTPUT_DIR@"
 CREATE_SUBDIRS         = NO
@@ -17,8 +17,8 @@ MULTILINE_CPP_IS_BRIEF = YES
 INHERIT_DOCS           = YES
 
 FULL_PATH_NAMES        = YES
-STRIP_FROM_PATH        = "@GLRPP_PROJECT_SOURCE_DIR@" \
-                         "@GLRPP_DOCS_SOURCE_DIR@"
+STRIP_FROM_PATH        = "@GLRPP_PROJECT_SOURCE_DIR@"    	\
+                         "@GLRPP_DOCS_SOURCE_DIR@"`		\
 STRIP_FROM_INC_PATH    = "@GLRPP_PROJECT_SOURCE_DIR@/include"
 TAB_SIZE               = 4
 OPTIMIZE_OUTPUT_FOR_C  = NO
@@ -67,7 +67,7 @@ VERBATIM_HEADERS       = YES
 GENERATE_HTML          = YES
 HTML_OUTPUT            = html
 HTML_FILE_EXTENSION    = .html
-HTML_EXTRA_STYLESHEET  = "@GLRPP_DOCS_SOURCE_DIR@/doxygen-darkmode.css"
+
 HTML_DYNAMIC_MENUS     = YES
 HTML_DYNAMIC_SECTIONS  = YES
 HTML_INDEX_NUM_ENTRIES = 120
@@ -81,7 +81,7 @@ GENERATE_LATEX         = YES
 LATEX_OUTPUT           = latex
 LATEX_BATCHMODE        = NO
 LATEX_HIDE_INDICES     = NO
-LATEX_CMD_NAME         = pdflatex
+LATEX_CMD_NAME         = xelatex
 MAKEINDEX_CMD_NAME     = makeindex
 COMPACT_LATEX          = NO
 PAPER_TYPE             = a4
