@@ -1,58 +1,65 @@
-DOC_SOURCES = \
-    mainpage.md \
-    glrpp-actions-basics.md \
-    glrpp-advanced-metaprogramming.md \
-    glrpp-basic-usage.md \
-    glrpp-case-study-semgrep.md \
-    glrpp-case-study-sql.md \
-    glrpp-case-study-syntax-highlighting.md \
-    glrpp-case-study-yaml.md \
-    glrpp-compile-time-regex.md \
-    glrpp-configuration.md \
-    glrpp-debugging-grammars.md \
-    glrpp-disambiguation-dsl.md \
-    glrpp-disambiguation-forests.md \
-    glrpp-explaining-files.md \
-    glrpp-explaining-rules.md \
-    glrpp-forking-parsers.md \
-    glrpp-handling-reflections.md \
-    glrpp-hooking-the-reader.md \
-    glrpp-hooking-up-lexer.md \
-    glrpp-installation.md \
-    glrpp-lexer-hooks.md \
-    glrpp-list-of-data-structures.md \
-    glrpp-managing-ast.md \
-    glrpp-managing-context.md \
-    glrpp-managing-dependencies.md \
-    glrpp-managing-stack.md \
-    glrpp-managing-symbols.md \
-    glrpp-metaprogramming-basics.md \
-    glrpp-metaprogramming-guide.md \
-    glrpp-native-dsl-specs.md \
-    glrpp-parser-object.md \
-    glrpp-pipeline-operator.md \
-    glrpp-reading-files.md \
-    glrpp-reading-tokens.md \
-    glrpp-reporting-errors.md \
-    glrpp-rewrite-dsl.md \
-    glrpp-rewriting-grammars.md \
-    glrpp-scannerless-parser.md \
-    glrpp-semantic-actions.md \
-    glrpp-semantic-basics.md \
-    glrpp-setting-up.md \
-    glrpp-specifying-grammars.md \
-    glrpp-string-utils.md \
-    glrpp-using-native-dsl.md \
-    glrpp-utf16-conversion.md \
-    glrpp-what-are-nodes.md \
-    glrpp-what-is-glr-parsing.md
+DOXYGEN ?= @DOXYGEN@
+AWK ?= awk
+SED ?= sed
+srcdir ?= .
+builddir ?= .
+top_srcdir ?= ..
+abs_srcdir ?= $(abspath $(srcdir))
+abs_builddir ?= $(abspath $(builddir))
+abs_top_srcdir ?= $(abspath $(top_srcdir))
+PACKAGE_NAME ?= glrpp
+PACKAGE_VERSION ?= 0.1.0
 
-EXTRA_DIST = $(DOC_SOURCES) Doxyfile.in layout.xml Doxygen.local
+BOOKLET_MANIFEST = $(srcdir)/booklet/Manifest.yaml
+BOOKLET_INPUT = $(builddir)/booklet-input.dox
+DOXYFILE = $(builddir)/Doxyfile
+HTML_INDEX = $(builddir)/html/index.html
+LATEX_REFMAN = $(builddir)/latex/refman.tex
+PDF_MANUAL = $(builddir)/glrpp-reference.pdf
 
-if HAVE_DOXYGEN
-docs: Doxyfile $(DOC_SOURCES)
-	$(DOXYGEN) Doxyfile
+.PHONY: all html latex pdf docs clean
 
-clean-local:
-	rm -rf html latex
-endif
+all: html
+
+$(BOOKLET_INPUT): $(BOOKLET_MANIFEST)
+	@mkdir -p $(builddir)
+	@rm -f $@
+	@{ $(AWK) '/^[[:space:]]*- file:[[:space:]]*/ { print $$3 }' $(BOOKLET_MANIFEST); find "$(srcdir)/booklet" -maxdepth 1 -name '*.md' -printf '%f\n' | sort; } | $(AWK) '!seen[$$0]++' | \
+	while read -r chapter; do \
+		if test -f "$(srcdir)/booklet/$$chapter"; then \
+			printf 'INPUT += "%s/booklet/%s"\n' "$(abs_srcdir)" "$$chapter" >> $@; \
+		fi; \
+	done
+
+$(DOXYFILE): $(srcdir)/Doxyfile.in $(BOOKLET_INPUT)
+	@mkdir -p $(builddir)
+	@$(SED) \
+		-e 's|@GLRPP_PROJECT_NAME@|@PACKAGE_NAME@|g' \
+		-e 's|@GLRPP_PROJECT_VERSION@|@PACKAGE_VERSION@|g' \
+		-e 's|@GLRPP_PROJECT_SOURCE_DIR@|$(abs_top_srcdir)|g' \
+		-e 's|@GLRPP_DOCS_SOURCE_DIR@|$(abs_srcdir)|g' \
+		-e 's|@GLRPP_DOCS_OUTPUT_DIR@|$(abs_builddir)|g' \
+		-e '/@GLRPP_BOOKLET_INPUT@/r $(BOOKLET_INPUT)' \
+		-e 's|@GLRPP_BOOKLET_INPUT@||g' \
+		$(srcdir)/Doxyfile.in > $@
+
+$(HTML_INDEX): $(DOXYFILE)
+	$(DOXYGEN) $(DOXYFILE)
+
+$(LATEX_REFMAN): $(DOXYFILE)
+	$(DOXYGEN) $(DOXYFILE)
+
+$(PDF_MANUAL): $(LATEX_REFMAN)
+	$(MAKE) -C $(builddir)/latex
+	cp $(builddir)/latex/refman.pdf $@
+
+html: $(HTML_INDEX)
+
+latex: $(LATEX_REFMAN)
+
+pdf: $(PDF_MANUAL)
+
+docs: html
+
+clean:
+	rm -rf $(BOOKLET_INPUT) $(DOXYFILE) $(builddir)/html $(builddir)/latex $(PDF_MANUAL)

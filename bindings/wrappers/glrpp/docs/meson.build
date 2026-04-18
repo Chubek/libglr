@@ -1,64 +1,73 @@
+fs = import('fs')
+
 doxygen = find_program('doxygen', required: true)
+make_program = find_program('gmake', 'make', required: true)
+awk = find_program('awk', required: true)
+sh = find_program('sh', required: true)
 
-doc_sources = files(
-    'mainpage.md',
-    'glrpp-actions-basics.md',
-    'glrpp-advanced-metaprogramming.md',
-    'glrpp-basic-usage.md',
-    'glrpp-case-study-semgrep.md',
-    'glrpp-case-study-sql.md',
-    'glrpp-case-study-syntax-highlighting.md',
-    'glrpp-case-study-yaml.md',
-    'glrpp-compile-time-regex.md',
-    'glrpp-configuration.md',
-    'glrpp-debugging-grammars.md',
-    'glrpp-disambiguation-dsl.md',
-    'glrpp-disambiguation-forests.md',
-    'glrpp-explaining-files.md',
-    'glrpp-explaining-rules.md',
-    'glrpp-forking-parsers.md',
-    'glrpp-handling-reflections.md',
-    'glrpp-hooking-the-reader.md',
-    'glrpp-hooking-up-lexer.md',
-    'glrpp-installation.md',
-    'glrpp-lexer-hooks.md',
-    'glrpp-list-of-data-structures.md',
-    'glrpp-managing-ast.md',
-    'glrpp-managing-context.md',
-    'glrpp-managing-dependencies.md',
-    'glrpp-managing-stack.md',
-    'glrpp-managing-symbols.md',
-    'glrpp-metaprogramming-basics.md',
-    'glrpp-metaprogramming-guide.md',
-    'glrpp-native-dsl-specs.md',
-    'glrpp-parser-object.md',
-    'glrpp-pipeline-operator.md',
-    'glrpp-reading-files.md',
-    'glrpp-reading-tokens.md',
-    'glrpp-reporting-errors.md',
-    'glrpp-rewrite-dsl.md',
-    'glrpp-rewriting-grammars.md',
-    'glrpp-scannerless-parser.md',
-    'glrpp-semantic-actions.md',
-    'glrpp-semantic-basics.md',
-    'glrpp-setting-up.md',
-    'glrpp-specifying-grammars.md',
-    'glrpp-string-utils.md',
-    'glrpp-using-native-dsl.md',
-    'glrpp-utf16-conversion.md',
-    'glrpp-what-are-nodes.md',
-    'glrpp-what-is-glr-parsing.md',
+manifest_path = meson.current_source_dir() / 'booklet' / 'Manifest.yaml'
+manifest_result = run_command(
+  awk,
+  '/^[[:space:]]*- file:[[:space:]]*/ { print $3 }',
+  manifest_path,
+  check: true
 )
 
-doxyfile = configure_file(
-    input: 'Doxyfile.in',
-    output: 'Doxyfile',
-    configuration: configuration_data()  # add your substitutions here
+booklet_input = ''
+seen_chapters = []
+foreach chapter : manifest_result.stdout().strip().split('\n')
+  if chapter == ''
+    continue
+  endif
+  chapter_path = meson.current_source_dir() / 'booklet' / chapter
+  if fs.exists(chapter_path)
+    booklet_input += 'INPUT += "@0@"\n'.format(chapter_path)
+    seen_chapters += [chapter]
+  endif
+endforeach
+
+extra_result = run_command(
+  sh,
+  '-c',
+  'find "$1" -maxdepth 1 -name "*.md" -printf "%f\n" | sort',
+  '_',
+  meson.current_source_dir() / 'booklet',
+  check: true
 )
 
-custom_target('docs',
-    input: [doxyfile] + doc_sources,
-    output: 'html',
-    command: [doxygen, doxyfile],
-    build_by_default: false,
+foreach chapter : extra_result.stdout().strip().split('\n')
+  if chapter == '' or seen_chapters.contains(chapter)
+    continue
+  endif
+  chapter_path = meson.current_source_dir() / 'booklet' / chapter
+  booklet_input += 'INPUT += "@0@"\n'.format(chapter_path)
+endforeach
+
+doxyfile_conf = configuration_data()
+doxyfile_conf.set('GLRPP_PROJECT_NAME', meson.project_name())
+doxyfile_conf.set('GLRPP_PROJECT_VERSION', meson.project_version())
+doxyfile_conf.set('GLRPP_PROJECT_SOURCE_DIR', meson.project_source_root())
+doxyfile_conf.set('GLRPP_DOCS_SOURCE_DIR', meson.current_source_dir())
+doxyfile_conf.set('GLRPP_DOCS_OUTPUT_DIR', meson.current_build_dir())
+doxyfile_conf.set('GLRPP_BOOKLET_INPUT', booklet_input.strip())
+
+configure_file(
+  input: 'Doxyfile.in',
+  output: 'Doxyfile',
+  configuration: doxyfile_conf,
+  format: 'cmake'
 )
+
+doxyfile_path = meson.current_build_dir() / 'Doxyfile'
+html_command = '@0@ "@1@"'.format(doxygen.full_path(), doxyfile_path)
+pdf_command = '@0@ "@1@" && cd "@2@/latex" && "@3@" && cp "refman.pdf" "../glrpp-reference.pdf"'.format(
+  doxygen.full_path(),
+  doxyfile_path,
+  meson.current_build_dir(),
+  make_program.full_path()
+)
+
+run_target('html', command: [sh, '-c', html_command])
+run_target('latex', command: [sh, '-c', html_command])
+run_target('docs', command: [sh, '-c', html_command])
+run_target('pdf', command: [sh, '-c', pdf_command])

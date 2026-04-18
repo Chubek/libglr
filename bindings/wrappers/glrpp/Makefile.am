@@ -14,11 +14,21 @@ AM_CPPFLAGS = \
 
 EXTRA_DIST = \
     scripts/archive-services.py \
-    scripts/docstring-services.py \
     cmake/glrppConfig.cmake.in \
     cmake/glrppConfigVersion.cmake \
     cmake/glrppTargets.cmake \
     docs/Doxyfile.in \
+    docs/CMakeLists.txt \
+    docs/meson.build \
+    docs/build.ninja \
+    docs/Makefile.am \
+    docs/mainpage.md \
+    docs/doxygen-darkmode.css \
+    docs/ltx-header.tex \
+    docs/ltx-footer.tex \
+    docs/mk-booklet.sh \
+    docs/booklet/Manifest.yaml \
+    docs/booklet/*.md \
     glrpp.pc
 
 lib_LTLIBRARIES =
@@ -76,16 +86,16 @@ install-data-local:
 
 if ENABLE_DOCS
 html:
-	$(PYTHON) $(srcdir)/scripts/docstring-services.py html
+	$(MAKE) -C docs html
 
 singlehtml:
-	$(PYTHON) $(srcdir)/scripts/docstring-services.py singlehtml
+	$(MAKE) -C docs html
 
 pdf:
-	$(PYTHON) $(srcdir)/scripts/docstring-services.py pdf
+	$(MAKE) -C docs pdf
 
 latex:
-	$(PYTHON) $(srcdir)/scripts/docstring-services.py latex
+	$(MAKE) -C docs latex
 
 docs: html singlehtml pdf latex
 endif

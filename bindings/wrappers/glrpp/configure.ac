@@ -72,7 +72,7 @@ AM_CONDITIONAL([INSTALL_BUNDLED_LIBLTDL], [test "x$enable_install_libltdl" = "xy
 
 AC_CONFIG_FILES([
   Makefile
-  docs/Doxyfile
+  docs/Makefile
   glrpp.pc
 ])
 AC_OUTPUT

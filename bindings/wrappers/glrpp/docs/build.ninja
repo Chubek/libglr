@@ -1,9 +1,35 @@
+builddir = docs/build
+project_name = glrpp
+project_version = 0.1.0
+docs_srcdir = docs
+project_srcdir = .
+doxyfile = $builddir/Doxyfile
+booklet_input = $builddir/booklet-input.dox
+
+rule booklet_manifest
+  command = mkdir -p $builddir && rm -f $out && { awk '/^[[:space:]]*- file:[[:space:]]*/ { print $$3 }' $docs_srcdir/booklet/Manifest.yaml; find $docs_srcdir/booklet -maxdepth 1 -name '*.md' -printf '%f\n' | sort; } | awk '!seen[$$0]++' | while read chapter; do if [ -f "$docs_srcdir/booklet/$$chapter" ]; then printf 'INPUT += "%s/%s/booklet/%s"\n' "$$(pwd)" "$docs_srcdir" "$$chapter" >> $out; fi; done
+  description = Collecting booklet chapters
+
+rule configure_doxyfile
+  command = sed -e 's|@GLRPP_PROJECT_NAME@|$project_name|g' -e 's|@GLRPP_PROJECT_VERSION@|$project_version|g' -e 's|@GLRPP_PROJECT_SOURCE_DIR@|$$(cd $project_srcdir && pwd)|g' -e 's|@GLRPP_DOCS_SOURCE_DIR@|$$(cd $docs_srcdir && pwd)|g' -e 's|@GLRPP_DOCS_OUTPUT_DIR@|$$(pwd)/$builddir|g' -e '/@GLRPP_BOOKLET_INPUT@/r $booklet_input' -e 's|@GLRPP_BOOKLET_INPUT@||g' $docs_srcdir/Doxyfile.in > $out
+  description = Configuring Doxygen
+
 rule doxygen
-  command = doxygen $in
-  description = Generating Doxygen docs
+  command = cd $builddir && doxygen Doxyfile
+  description = Generating documentation
 
-build docs/Doxyfile: configure docs/Doxyfile.in
-  # If you use a configure step; otherwise just use Doxyfile directly
+rule pdf
+  command = cd $builddir/latex && make && cp refman.pdf ../glrpp-reference.pdf
+  description = Building PDF manual
 
-build docs: doxygen docs/Doxyfile
-  pool = console
+build $booklet_input: booklet_manifest $docs_srcdir/booklet/Manifest.yaml
+build $doxyfile: configure_doxyfile $docs_srcdir/Doxyfile.in | $booklet_input
+build $builddir/html/index.html $builddir/latex/refman.tex: doxygen $doxyfile
+build $builddir/glrpp-reference.pdf: pdf $builddir/latex/refman.tex
+
+build html: phony $builddir/html/index.html
+build latex: phony $builddir/latex/refman.tex
+build pdf: phony $builddir/glrpp-reference.pdf
+build docs: phony html
+
+default html

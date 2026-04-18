@@ -18,7 +18,6 @@ python = import('python').find_installation('python3', required: false)
 
 scripts_dir = meson.current_source_dir() / 'scripts'
 archive_script = scripts_dir / 'archive-services.py'
-docstring_script = scripts_dir / 'docstring-services.py'
 
 glrpp_inc = include_directories(
   'include',
@@ -109,9 +108,6 @@ if build_zlib and python.found()
   run_target('zlib', command: [python, archive_script, 'zlib'])
 endif
 
-if build_docs and python.found()
-  run_target('html', command: [python, docstring_script, 'html'])
-  run_target('singlehtml', command: [python, docstring_script, 'singlehtml'])
-  run_target('pdf', command: [python, docstring_script, 'pdf'])
-  run_target('latex', command: [python, docstring_script, 'latex'])
+if build_docs
+  subdir('docs')
 endif

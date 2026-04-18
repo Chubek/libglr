@@ -1,195 +1,101 @@
-#---------------------------------------------------------------------------
-# Project metadata
-#---------------------------------------------------------------------------
-PROJECT_NAME           = "glrpp"
-PROJECT_NUMBER         = @VERSION@
-PROJECT_BRIEF          = "Modern C++20 Wrapper for GLR Parsing"
-PROJECT_LOGO           =
-OUTPUT_DIRECTORY       = @builddir@/docs
+DOXYFILE_ENCODING      = UTF-8
+PROJECT_NAME           = "@GLRPP_PROJECT_NAME@"
+PROJECT_NUMBER         = "@GLRPP_PROJECT_VERSION@"
+PROJECT_BRIEF          = "Header-only C++ wrapper for libglr"
+OUTPUT_DIRECTORY       = "@GLRPP_DOCS_OUTPUT_DIR@"
+CREATE_SUBDIRS         = NO
+ALLOW_UNICODE_NAMES    = YES
+OUTPUT_LANGUAGE        = English
 
-#---------------------------------------------------------------------------
-# Input sources
-#---------------------------------------------------------------------------
-INPUT                  = @top_srcdir@/docs/mainpage.md \
-                         @top_srcdir@/docs/glrpp/-installation.md \
-                         @top_srcdir@/docs/glrpp/-setting-up.md \
-                         @top_srcdir@/docs/glrpp/-basic-usage.md \
-                         @top_srcdir@/docs/glrpp/-what-is-glr-parsing.md \
-                         @top_srcdir@/docs/glrpp/-specifying-grammars.md \
-                         @top_srcdir@/docs/glrpp/-using-native-dsl.md \
-                         @top_srcdir@/docs/glrpp/-what-are-nodes.md \
-                         @top_srcdir@/docs/glrpp/-managing-symbols.md \
-                         @top_srcdir@/docs/glrpp/-parser-object.md \
-                         @top_srcdir@/docs/glrpp/-hooking-up-lexer.md \
-                         @top_srcdir@/docs/glrpp/-lexer-hooks.md \
-                         @top_srcdir@/docs/glrpp/-reading-tokens.md \
-                         @top_srcdir@/docs/glrpp/-reading-files.md \
-                         @top_srcdir@/docs/glrpp/-scannerless-parser.md \
-                         @top_srcdir@/docs/glrpp/-semantic-basics.md \
-                         @top_srcdir@/docs/glrpp/-actions-basics.md \
-                         @top_srcdir@/docs/glrpp/-semantic-actions.md \
-                         @top_srcdir@/docs/glrpp/-managing-ast.md \
-                         @top_srcdir@/docs/glrpp/-managing-context.md \
-                         @top_srcdir@/docs/glrpp/-disambiguation-forests.md \
-                         @top_srcdir@/docs/glrpp/-disambiguation-dsl.md \
-                         @top_srcdir@/docs/glrpp/-rewriting-grammars.md \
-                         @top_srcdir@/docs/glrpp/-rewrite-dsl.md \
-                         @top_srcdir@/docs/glrpp/-forking-parsers.md \
-                         @top_srcdir@/docs/glrpp/-managing-stack.md \
-                         @top_srcdir@/docs/glrpp/-managing-dependencies.md \
-                         @top_srcdir@/docs/glrpp/-configuration.md \
-                         @top_srcdir@/docs/glrpp/-debugging-grammars.md \
-                         @top_srcdir@/docs/glrpp/-reporting-errors.md \
-                         @top_srcdir@/docs/glrpp/-metaprogramming-basics.md \
-                         @top_srcdir@/docs/glrpp/-metaprogramming-guide.md \
-                         @top_srcdir@/docs/glrpp/-advanced-metaprogramming.md \
-                         @top_srcdir@/docs/glrpp/-compile-time-regex.md \
-                         @top_srcdir@/docs/glrpp/-handling-reflections.md \
-                         @top_srcdir@/docs/glrpp/-string-utils.md \
-                         @top_srcdir@/docs/glrpp/-utf16-conversion.md \
-                         @top_srcdir@/docs/glrpp/-pipeline-operator.md \
-                         @top_srcdir@/docs/glrpp/-list-of-data-structures.md \
-                         @top_srcdir@/docs/glrpp/-case-study-sql.md \
-                         @top_srcdir@/docs/glrpp/-case-study-yaml.md \
-                         @top_srcdir@/docs/glrpp/-case-study-semgrep.md \
-                         @top_srcdir@/docs/glrpp/-case-study-syntax-highlighting.md \
-                         @top_srcdir@/docs/glrpp/-native-dsl-specs.md \
-                         @top_srcdir@/docs/glrpp/-explaining-rules.md \
-                         @top_srcdir@/docs/glrpp/-explaining-files.md \
-                         @top_srcdir@/docs/glrpp/-hooking-the-reader.md \
-                         @top_srcdir@/include/glrpp
+BRIEF_MEMBER_DESC      = YES
+REPEAT_BRIEF           = YES
+ALWAYS_DETAILED_SEC    = YES
+INLINE_INHERITED_MEMB  = YES
+JAVADOC_AUTOBRIEF      = YES
+QT_AUTOBRIEF           = YES
+MULTILINE_CPP_IS_BRIEF = YES
+INHERIT_DOCS           = YES
 
-INPUT_ENCODING         = UTF-8
-FILE_PATTERNS          = *.md *.hpp *.h *.cpp *.c
-RECURSIVE              = YES
-USE_MDFILE_AS_MAINPAGE = @top_srcdir@/docs/mainpage.md
-
-#---------------------------------------------------------------------------
-# Parsing behavior
-#---------------------------------------------------------------------------
-MARKDOWN_SUPPORT       = YES
-AUTOLINK_SUPPORT       = YES
+FULL_PATH_NAMES        = YES
+STRIP_FROM_PATH        = "@GLRPP_PROJECT_SOURCE_DIR@" \
+                         "@GLRPP_DOCS_SOURCE_DIR@"
+STRIP_FROM_INC_PATH    = "@GLRPP_PROJECT_SOURCE_DIR@/include"
 TAB_SIZE               = 4
+OPTIMIZE_OUTPUT_FOR_C  = NO
 BUILTIN_STL_SUPPORT    = YES
-CPP_CLI_SUPPORT        = NO
+
+MARKDOWN_SUPPORT       = YES
+TOC_INCLUDE_HEADINGS   = 3
+AUTOLINK_SUPPORT       = YES
+USE_MDFILE_AS_MAINPAGE = "@GLRPP_DOCS_SOURCE_DIR@/mainpage.md"
+
+INPUT                  = "@GLRPP_PROJECT_SOURCE_DIR@/include/glrpp" \
+                         "@GLRPP_DOCS_SOURCE_DIR@/mainpage.md"
+@GLRPP_BOOKLET_INPUT@
+FILE_PATTERNS          = *.hpp \
+                         *.md
+RECURSIVE              = YES
+EXCLUDE_PATTERNS       =
+IMAGE_PATH             = "@GLRPP_DOCS_SOURCE_DIR@"
+
 EXTRACT_ALL            = YES
 EXTRACT_PRIVATE        = NO
+EXTRACT_PRIV_VIRTUAL   = NO
+EXTRACT_PACKAGE        = NO
 EXTRACT_STATIC         = YES
+EXTRACT_LOCAL_CLASSES  = YES
+HIDE_UNDOC_MEMBERS     = NO
+HIDE_UNDOC_CLASSES     = NO
+HIDE_FRIEND_COMPOUNDS  = NO
+HIDE_IN_BODY_DOCS      = NO
+INTERNAL_DOCS          = NO
 
-#---------------------------------------------------------------------------
-# Preprocessing (for C++20 / glrpp macros)
-#---------------------------------------------------------------------------
-ENABLE_PREPROCESSING   = YES
-MACRO_EXPANSION        = YES
-EXPAND_ONLY_PREDEF     = NO
-PREDEFINED             = __cplusplus=202002L
+SORT_MEMBER_DOCS       = YES
+SORT_BRIEF_DOCS        = YES
+SORT_BY_SCOPE_NAME     = YES
+SORT_GROUP_NAMES       = YES
+ALPHABETICAL_INDEX     = YES
+ENUM_VALUES_PER_LINE   = 1
 
-#---------------------------------------------------------------------------
-# Layout & navigation
-#---------------------------------------------------------------------------
-LAYOUT_FILE            = @top_srcdir@/docs/layout.xml
-GENERATE_TREEVIEW      = YES
-DISABLE_INDEX          = NO
-FULL_SIDEBAR           = NO
-TOC_INCLUDE_HEADINGS   = 4
-
-#---------------------------------------------------------------------------
-# Warnings
-#---------------------------------------------------------------------------
-QUIET                  = NO
-WARNINGS               = YES
-WARN_IF_UNDOCUMENTED   = YES
-WARN_IF_DOC_ERROR      = YES
-WARN_NO_PARAMDOC       = YES
-WARN_FORMAT            = "$file:$line: $text"
-
-#---------------------------------------------------------------------------
-# Source browsing
-#---------------------------------------------------------------------------
 SOURCE_BROWSER         = YES
 INLINE_SOURCES         = NO
-STRIP_CODE_COMMENTS    = YES
 REFERENCED_BY_RELATION = YES
 REFERENCES_RELATION    = YES
+REFERENCES_LINK_SOURCE = YES
+VERBATIM_HEADERS       = YES
 
-#---------------------------------------------------------------------------
-# HTML output — single-page
-#---------------------------------------------------------------------------
 GENERATE_HTML          = YES
 HTML_OUTPUT            = html
 HTML_FILE_EXTENSION    = .html
-
-# Single-page HTML: all content in one file
-# Doxygen doesn't natively produce a single .html, so we:
-#   1. Disable the treeview/nav for the singlehtml target
-#   2. Use GENERATE_HTMLHELP to produce a combined index
-#   3. Post-process with a script (see below), OR use these settings
-#      to get as close as possible to a single-page feel:
-
-HTML_COLORSTYLE        = LIGHT
+HTML_EXTRA_STYLESHEET  = "@GLRPP_DOCS_SOURCE_DIR@/doxygen-darkmode.css"
+HTML_DYNAMIC_MENUS     = YES
 HTML_DYNAMIC_SECTIONS  = YES
-HTML_INDEX_NUM_ENTRIES = 0
+HTML_INDEX_NUM_ENTRIES = 120
+GENERATE_TREEVIEW      = YES
+FULL_SIDEBAR           = YES
+DISABLE_INDEX          = NO
 SEARCHENGINE           = YES
 SERVER_BASED_SEARCH    = NO
 
-# For true single-page output, enable this and post-process:
-GENERATE_HTMLHELP      = NO
-GENERATE_DOCSET        = NO
-
-# Alternatively, use the HTML_EXTRA_FILES + custom header/footer
-# to inline everything. See the post-processing note at the bottom.
-
-HTML_EXTRA_STYLESHEET  = @top_srcdir@/docs/doxygen-dark.css
-HTML_EXTRA_FILES       = @top_srcdir@/docs/theme-toggle.js
-HTML_HEADER            =
-HTML_FOOTER            =
-
-#---------------------------------------------------------------------------
-# LaTeX output
-#---------------------------------------------------------------------------
 GENERATE_LATEX         = YES
 LATEX_OUTPUT           = latex
-LATEX_CMD_NAME         = @LATEX_COMPILER@
-
-# Produce a single combined PDF
+LATEX_BATCHMODE        = NO
+LATEX_HIDE_INDICES     = NO
+LATEX_CMD_NAME         = pdflatex
+MAKEINDEX_CMD_NAME     = makeindex
 COMPACT_LATEX          = NO
 PAPER_TYPE             = a4
-LATEX_HIDE_INDICES     = NO
-LATEX_BIB_STYLE        = plain
-
-# Better typography
 PDF_HYPERLINKS         = YES
 USE_PDFLATEX           = YES
-LATEX_BATCHMODE        = YES
-LATEX_TIMESTAMP        = YES
+LATEX_HEADER           = "@GLRPP_DOCS_SOURCE_DIR@/ltx-header.tex"
+LATEX_FOOTER           = "@GLRPP_DOCS_SOURCE_DIR@/ltx-footer.tex"
 
-# Extra packages for code listings and Unicode
-LATEX_EXTRA_STYLESHEET =
-LATEX_EXTRA_FILES      =
-
-# Header/footer customization
-LATEX_HEADER           = @top_srcdir@/docs/ltx-header.tex
-LATEX_FOOTER           = @top_srcdir@/docs/ltx-footer.tex
-
-#---------------------------------------------------------------------------
-# Other output formats — disabled
-#---------------------------------------------------------------------------
 GENERATE_MAN           = NO
-GENERATE_RTF           = NO
 GENERATE_XML           = NO
-GENERATE_DOCBOOK       = NO
+GENERATE_RTF           = NO
 
-#---------------------------------------------------------------------------
-# Graphs (optional, disable if Graphviz not available)
-#---------------------------------------------------------------------------
-HAVE_DOT               = @HAVE_DOT@
-DOT_NUM_THREADS        = 0
-CLASS_GRAPH            = YES
-COLLABORATION_GRAPH    = YES
-INCLUDE_GRAPH          = YES
-INCLUDED_BY_GRAPH      = YES
-CALL_GRAPH             = NO
-CALLER_GRAPH           = NO
-DOT_IMAGE_FORMAT       = svg
-INTERACTIVE_SVG        = YES
-
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = NO
+WARN_IF_DOC_ERROR      = YES
+WARN_NO_PARAMDOC       = NO
+QUIET                  = YES

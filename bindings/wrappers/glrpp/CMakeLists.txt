@@ -85,7 +85,7 @@ if(GLRPP_INSTALL)
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     )
     install(
-        DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/third_party/nameof/include/nameof
+        DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/third_party/nameof/include/
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     )
     install(
@@ -131,19 +131,9 @@ if(GLRPP_INSTALL)
     )
 endif()
 
-if(BUILD_DOCS AND Python3_Interpreter_FOUND)
-    add_custom_target(html
-        COMMAND ${Python3_EXECUTABLE} ${GLRPP_DOCSTRING_SCRIPT} html
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-    add_custom_target(singlehtml
-        COMMAND ${Python3_EXECUTABLE} ${GLRPP_DOCSTRING_SCRIPT} singlehtml
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-    add_custom_target(pdf
-        COMMAND ${Python3_EXECUTABLE} ${GLRPP_DOCSTRING_SCRIPT} pdf
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-    add_custom_target(latex
-        COMMAND ${Python3_EXECUTABLE} ${GLRPP_DOCSTRING_SCRIPT} latex
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+# Documentation subdirectory
+if(BUILD_DOCS)
+    add_subdirectory(docs)
 endif()
 
 if(BUILD_DEP AND Python3_Interpreter_FOUND)
@@ -168,16 +158,4 @@ if(BUILD_ZLIB AND Python3_Interpreter_FOUND)
     add_custom_target(zlib
         COMMAND ${Python3_EXECUTABLE} ${GLRPP_ARCHIVER_SCRIPT} zlib
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-endif()
-
-if(BUILD_DOCS)
-    find_package(Doxygen REQUIRED)
-    set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in)
-    set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
-    configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
-    add_custom_target(doc
-        COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        COMMENT "Generating API documentation with Doxygen"
-        VERBATIM)
 endif()

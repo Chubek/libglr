@@ -1,0 +1,247 @@
+:root {
+    --glr-bg: #111827;
+    --glr-bg-soft: #172033;
+    --glr-surface: #1f2937;
+    --glr-surface-2: #243247;
+    --glr-border: #334155;
+    --glr-text: #e5eefb;
+    --glr-text-soft: #b6c4da;
+    --glr-accent: #7dd3fc;
+    --glr-accent-2: #93c5fd;
+    --glr-code: #0b1220;
+    --glr-code-text: #dbeafe;
+    --glr-success: #86efac;
+}
+
+html,
+body {
+    background: var(--glr-bg);
+    color: var(--glr-text);
+}
+
+body,
+table,
+div,
+p,
+li,
+dd,
+td,
+th {
+    color: var(--glr-text);
+}
+
+a,
+a:visited,
+.contents a,
+.contents a:visited,
+.qindex a,
+.qindex a:visited,
+.navpath li.navelem a,
+.el,
+a.el {
+    color: var(--glr-accent);
+}
+
+a:hover,
+.contents a:hover,
+.navpath li.navelem a:hover {
+    color: var(--glr-accent-2);
+}
+
+#top,
+#titlearea,
+.header,
+.headertitle,
+.summary,
+.groupheader,
+.memtitle,
+.fragment,
+.directory,
+.levels,
+.tabs,
+.tabs2,
+.tabs3,
+.sm-dox,
+.ui-resizable-side,
+.ui-resizable-handle,
+.navpath,
+.memitem,
+.memproto,
+.memdoc,
+.fieldtable,
+.directory tr.even,
+.directory tr.odd {
+    background: var(--glr-surface);
+    color: var(--glr-text);
+}
+
+.contents,
+div.contents,
+div.textblock,
+blockquote,
+dl,
+table.memberdecls,
+table.doxtable,
+table.fieldtable,
+.inherit_header,
+.dyncontent,
+.dynheader,
+.section,
+.summary,
+.levels {
+    background: transparent;
+}
+
+.memitem,
+.memproto,
+.memdoc,
+.fragment,
+table.doxtable,
+table.fieldtable,
+.directory,
+.toc,
+dl.note,
+dl.warning,
+dl.attention,
+dl.pre,
+dl.post {
+    border: 1px solid var(--glr-border);
+    border-radius: 8px;
+}
+
+table.doxtable th,
+table.fieldtable th,
+.memproto,
+.groupheader,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    color: var(--glr-accent-2);
+}
+
+table.doxtable tr:nth-child(odd),
+table.fieldtable tr:nth-child(odd),
+.directory tr:nth-child(odd),
+.memberdecls tr:nth-child(odd) {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+table.doxtable tr:nth-child(even),
+table.fieldtable tr:nth-child(even),
+.directory tr:nth-child(even),
+.memberdecls tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+table.doxtable td,
+table.doxtable th,
+table.fieldtable td,
+table.fieldtable th,
+.memberdecls td,
+.memberdecls th {
+    border-color: var(--glr-border);
+}
+
+code,
+pre,
+.fragment,
+.line,
+div.line,
+.ttc,
+span.preprocessor,
+span.stringliteral,
+span.charliteral {
+    background: var(--glr-code);
+    color: var(--glr-code-text);
+}
+
+.fragment,
+div.fragment {
+    padding: 0.75rem 1rem;
+}
+
+span.keyword,
+span.keywordflow,
+span.keywordtype {
+    color: #c4b5fd;
+}
+
+span.comment {
+    color: #86efac;
+}
+
+span.stringliteral,
+span.charliteral {
+    color: #fdba74;
+}
+
+span.preprocessor {
+    color: #f9a8d4;
+}
+
+span.lineno,
+span.lineno a,
+span.lineno a:visited {
+    color: #64748b;
+    background: transparent;
+}
+
+.qindex,
+.navpath,
+.tabs,
+.tabs2,
+.tabs3,
+.sm-dox a,
+.sm-dox a:visited {
+    background: var(--glr-surface);
+    color: var(--glr-text-soft);
+}
+
+.tablist li,
+.tabs .tablist li a,
+.tabs2 .tablist li a,
+.tabs3 .tablist li a {
+    background: var(--glr-surface-2);
+    border-color: var(--glr-border);
+    color: var(--glr-text);
+}
+
+.tabs .tablist li.current a,
+.tabs2 .tablist li.current a,
+.tabs3 .tablist li.current a {
+    background: var(--glr-accent);
+    color: #08111d;
+}
+
+.toc,
+.toc h3,
+.toc li,
+.toc a,
+.toc a:visited {
+    background: var(--glr-surface);
+    color: var(--glr-text);
+}
+
+dl.note dt,
+dl.warning dt,
+dl.attention dt {
+    color: var(--glr-success);
+}
+
+input,
+select,
+textarea,
+.MSearchBoxInactive,
+.MSearchBoxActive {
+    background: var(--glr-code);
+    color: var(--glr-text);
+    border: 1px solid var(--glr-border);
+}
+
+hr,
+.separator {
+    border-color: var(--glr-border);
+}
