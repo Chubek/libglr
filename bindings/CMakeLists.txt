@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 4.2)
+
 find_package(SWIG REQUIRED)
 include(UseSWIG)
 

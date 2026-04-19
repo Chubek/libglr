@@ -16,9 +16,6 @@
 %}
 
 %include <stdint.i>
-%include <cstring.i>
-%include <cpointer.i>
-%include <typemaps.i>
 %include <exception.i>
 
 %define GLR_SWIG_LANG_NOTE(TEXT)

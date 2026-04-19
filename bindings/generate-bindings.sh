@@ -113,11 +113,23 @@ language_swig_options() {
     javascript)
       printf '%s\n' '-node'
       ;;
-    python)
-      :
+    ruby)
+      printf '%s\n' '-initname' 'libglr'
       ;;
     *)
       :
+      ;;
+  esac
+}
+
+language_wrapper_extension() {
+  local language=$1
+  case "$language" in
+    csharp|java)
+      printf 'cxx\n'
+      ;;
+    *)
+      printf 'c\n'
       ;;
   esac
 }
@@ -193,6 +205,7 @@ This directory contains SWIG-generated low-level bindings for libglr.
 - Generated from `bindings/libglr.i`
 - Intended as a thin FFI layer for higher-level wrappers.
 - Helper accessors prefixed with `glr_binding_` smooth over C arrays and unions.
+- `Makefile` builds and installs the binding with the language toolchain when supported.
 EOF2
   python3 - "$target_dir/README.md" "$language" <<'PYEOF'
 from pathlib import Path
@@ -261,10 +274,73 @@ GOEOF
     *)
       cat > "$examples_dir/README.txt" <<EOF2
 No language-specific example template is bundled yet for $language.
-Use the generated API files together with the helpers documented in BINDINGS.md.
+Use the generated API files together with the helpers documented in README.md.
 EOF2
       ;;
   esac
+}
+
+write_python_package_files() {
+  local target_dir=$1
+
+  cat > "$target_dir/pyproject.toml" <<'EOF2'
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+EOF2
+
+  cat > "$target_dir/setup.py" <<'EOF2'
+from pathlib import Path
+from setuptools import Extension, setup
+
+root = Path(__file__).resolve().parent
+runtime = root / "runtime"
+include_dirs = [str(runtime / "include")]
+library_dirs = [str(runtime)]
+libraries = ["libglr", "glr"]
+extra_link_args = []
+
+if not any((runtime / f"lib{name}.a").exists() or (runtime / f"lib{name}.so").exists() or (runtime / f"{name}.dll").exists() for name in libraries):
+    libraries = []
+    extra_link_args = [str(path) for path in runtime.glob("lib*.a")]
+
+setup(
+    name="libglr-bindings",
+    version="1.0.0",
+    py_modules=["libglr"],
+    ext_modules=[
+        Extension(
+            "_libglr",
+            sources=["libglr_wrap.c"],
+            include_dirs=include_dirs,
+            library_dirs=library_dirs,
+            libraries=libraries,
+            extra_link_args=extra_link_args,
+        )
+    ],
+)
+EOF2
+}
+
+write_ruby_package_files() {
+  local target_dir=$1
+
+  mkdir -p "$target_dir/lib"
+  cat > "$target_dir/lib/libglr.rb" <<'EOF2'
+# frozen_string_literal: true
+
+require_relative '../libglr'
+EOF2
+
+  cat > "$target_dir/libglr.gemspec" <<'EOF2'
+Gem::Specification.new do |spec|
+  spec.name = 'libglr-bindings'
+  spec.version = '1.0.0'
+  spec.summary = 'SWIG-generated libglr bindings'
+  spec.require_paths = ['lib']
+  spec.files = Dir.glob('{lib,examples,runtime}/**/*') + ['libglr_wrap.c', 'libglr.rb', 'Makefile']
+end
+EOF2
 }
 
 write_package_scaffold() {
@@ -273,42 +349,21 @@ write_package_scaffold() {
 
   case "$language" in
     python)
-      cat > "$target_dir/pyproject.toml" <<'PYPROJECT'
-[build-system]
-requires = ["setuptools>=61"]
-build-backend = "setuptools.build_meta"
-PYPROJECT
-      cat > "$target_dir/setup.py" <<'SETUPPY'
-from setuptools import setup
-
-setup(name="libglr-bindings", version="1.0.0", py_modules=["libglr"])
-SETUPPY
+      write_python_package_files "$target_dir"
       ;;
     ruby)
-      cat > "$target_dir/libglr.gemspec" <<'GEMSPEC'
-Gem::Specification.new do |spec|
-  spec.name = "libglr-bindings"
-  spec.version = "1.0.0"
-  spec.summary = "SWIG-generated libglr bindings"
-  spec.files = Dir.glob("**/*")
-end
-GEMSPEC
-      cat > "$target_dir/Rakefile" <<'RAKEFILE'
-task default do
-  puts "Build the native extension or package wrapper assets here."
-end
-RAKEFILE
+      write_ruby_package_files "$target_dir"
       ;;
     go)
-      cat > "$target_dir/go.mod" <<'GOMOD'
+      cat > "$target_dir/go.mod" <<'EOF2'
 module example.com/libglr-bindings
 
 go 1.20
-GOMOD
+EOF2
       ;;
     java)
       mkdir -p "$target_dir/src/main/java"
-      cat > "$target_dir/pom.xml" <<'POM'
+      cat > "$target_dir/pom.xml" <<'EOF2'
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -317,21 +372,159 @@ GOMOD
   <artifactId>libglr-bindings</artifactId>
   <version>1.0.0</version>
 </project>
-POM
+EOF2
       ;;
     csharp)
-      cat > "$target_dir/libglr-bindings.csproj" <<'CSPROJ'
+      cat > "$target_dir/libglr-bindings.csproj" <<'EOF2'
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
 </Project>
-CSPROJ
+EOF2
       ;;
     *)
       cat > "$target_dir/PACKAGE.txt" <<EOF2
 Packaging scaffolding for $language should be added by a higher-level wrapper.
 The low-level binding artifacts are ready in this directory.
+EOF2
+      ;;
+  esac
+}
+
+write_language_runtime_files() {
+  local target_dir=$1
+  local language=$2
+
+  case "$language" in
+    python)
+      write_python_package_files "$target_dir"
+      ;;
+    ruby)
+      cat > "$target_dir/libglr.rb" <<'EOF2'
+# frozen_string_literal: true
+
+require_relative 'lib/libglr'
+EOF2
+      write_ruby_package_files "$target_dir"
+      ;;
+    *)
+      :
+      ;;
+  esac
+}
+
+write_binding_makefile() {
+  local target_dir=$1
+  local language=$2
+
+  case "$language" in
+    python)
+      cat > "$target_dir/Makefile" <<'EOF2'
+PYTHON ?= python3
+PIP ?= $(PYTHON) -m pip
+
+.PHONY: all build install clean
+
+all: build
+
+build:
+	$(PYTHON) setup.py build_ext --inplace
+
+install:
+	$(PIP) install .
+
+clean:
+	rm -rf build *.egg-info _libglr*.so _libglr*.pyd _libglr*.dll
+EOF2
+      ;;
+    ruby)
+      cat > "$target_dir/Makefile" <<'EOF2'
+RUBY ?= ruby
+CC ?= cc
+CFLAGS ?= -fPIC -O2
+RUBY_CFLAGS := $(shell $(RUBY) -rrbconfig -e 'print RbConfig::CONFIG[%q{CFLAGS}]')
+RUBY_CPPFLAGS := $(shell $(RUBY) -rrbconfig -e 'print RbConfig::CONFIG[%q{CPPFLAGS}]')
+RUBY_HDRDIR := $(shell $(RUBY) -rrbconfig -e 'print RbConfig::CONFIG[%q{rubyhdrdir}]')
+RUBY_ARCHHDRDIR := $(shell $(RUBY) -rrbconfig -e 'print RbConfig::CONFIG[%q{rubyarchhdrdir}]')
+RUBY_LIBDIR := $(shell $(RUBY) -rrbconfig -e 'print RbConfig::CONFIG[%q{libdir}]')
+RUBY_SO_NAME := $(shell $(RUBY) -rrbconfig -e 'print RbConfig::CONFIG[%q{RUBY_SO_NAME}]')
+RUBY_SITEARCHDIR := $(shell $(RUBY) -rrbconfig -e 'print RbConfig::CONFIG[%q{sitearchdir}]')
+RUBY_SITELIBDIR := $(shell $(RUBY) -rrbconfig -e 'print RbConfig::CONFIG[%q{sitelibdir}]')
+RUBY_DLDFLAGS := $(shell $(RUBY) -rrbconfig -e 'print [RbConfig::CONFIG[%q{LIBRUBYARG_SHARED}], RbConfig::CONFIG[%q{DLDFLAGS}], RbConfig::CONFIG[%q{LDSHAREDXXFLAGS}]].compact.join(%q{ })')
+LIBGLR_LINK := $(shell find runtime -maxdepth 1 -type f \( -name 'libglr.*' -o -name 'liblibglr.*' \) | head -n 1)
+
+.PHONY: all build install clean
+
+all: build
+
+build: libglr.so
+
+libglr.so: libglr_wrap.c lib/libglr.rb
+	$(CC) $(CFLAGS) $(RUBY_CFLAGS) $(RUBY_CPPFLAGS) -Iruntime/include -I$(RUBY_HDRDIR) -I$(RUBY_ARCHHDRDIR) -shared libglr_wrap.c -L$(RUBY_LIBDIR) $(RUBY_DLDFLAGS) $(LIBGLR_LINK) -o $@
+
+install: build
+	install -d $(DESTDIR)$(RUBY_SITELIBDIR) $(DESTDIR)$(RUBY_SITEARCHDIR)
+	install -m 0644 lib/libglr.rb $(DESTDIR)$(RUBY_SITELIBDIR)/libglr.rb
+	install -m 0755 libglr.so $(DESTDIR)$(RUBY_SITEARCHDIR)/libglr.so
+
+clean:
+	rm -f libglr.so
+EOF2
+      ;;
+    java)
+      cat > "$target_dir/Makefile" <<'EOF2'
+JAVAC ?= javac
+JAR ?= jar
+
+.PHONY: all build install clean
+
+all: build
+
+build:
+	$(JAVAC) *.java
+	$(JAR) cf libglr.jar *.class
+
+install: build
+	@echo "Copy libglr.jar and the native library to your Java runtime layout."
+
+clean:
+	rm -f *.class libglr.jar
+EOF2
+      ;;
+    csharp)
+      cat > "$target_dir/Makefile" <<'EOF2'
+DOTNET ?= dotnet
+
+.PHONY: all build install clean
+
+all: build
+
+build:
+	$(DOTNET) build libglr-bindings.csproj
+
+install: build
+	$(DOTNET) pack libglr-bindings.csproj -o dist
+
+clean:
+	$(DOTNET) clean libglr-bindings.csproj
+	rm -rf bin obj dist
+EOF2
+      ;;
+    *)
+      cat > "$target_dir/Makefile" <<EOF2
+.PHONY: all build install clean
+
+all: build
+
+build:
+	@echo "No build recipe is bundled yet for $language."
+
+install:
+	@echo "No installation recipe is bundled yet for $language."
+
+clean:
+	@true
 EOF2
       ;;
   esac
@@ -377,8 +570,11 @@ generate_language() {
   local archive_format=$9
   local swig_opts_file=${10}
   local target_dir="$output_root/_bindings_libglr_${language}"
-  local wrapper_ext="c"
-  local swig_output="$target_dir/libglr_wrap.${wrapper_ext}"
+  local wrapper_ext
+  local swig_output
+
+  wrapper_ext=$(language_wrapper_extension "$language")
+  swig_output="$target_dir/libglr_wrap.${wrapper_ext}"
 
   rm -rf "$target_dir"
   mkdir -p "$target_dir"
@@ -395,6 +591,8 @@ generate_language() {
   fi
 
   copy_runtime_assets "$target_dir"
+  write_language_runtime_files "$target_dir" "$language"
+  write_binding_makefile "$target_dir" "$language"
 
   if [[ "$doc_requested" == "1" ]]; then
     write_binding_notes "$target_dir" "$language"
