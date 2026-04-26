@@ -225,6 +225,7 @@ third_party/*
 !WRAPPERS.md
 !MOOSEPAW.md
 !DEPENDENCIES.md
+!docs/*.md
 
 *.md
 

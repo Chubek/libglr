@@ -9,6 +9,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 option(BUILD_TESTS "Build test suite" ON)
 option(BUILD_EXAMPLES "Build examples" ON)
 option(BUILD_DOCUMENTATION "Build documentation" ON)
+option(EMBED_MD_DOCS "Embed and install markdown documentation" ON)
 option(BUILD_DISAMBSTD "Build the standard disambiguation library" ON)
 option(BUILD_REWRITELIB "Install the standard rewrite library" ON)
 option(BUILD_SWIG_BINDINGS "Build SWIG bindings when SWIG is available" OFF)
@@ -187,14 +188,27 @@ install(FILES
 if(HAVE_LMDB)
     install(FILES
         include/glr/cache.h
+        include/glr/dependency.h
+        include/glr/diff.h
+        include/glr/forest-merge.h
+        include/glr/serialization.h
         ${CMAKE_CURRENT_BINARY_DIR}/include/glr/config.h
         DESTINATION include/glr
     )
 endif()
 
-# Install documentation
+# Documentation generation and optional Markdown installation
 if(BUILD_DOCUMENTATION)
     add_subdirectory(docs)
+endif()
+
+if(EMBED_MD_DOCS)
+    install(DIRECTORY docs/
+        DESTINATION share/doc/${PROJECT_NAME}/markdown
+        FILES_MATCHING
+            PATTERN "*.md"
+            PATTERN "build" EXCLUDE
+    )
 endif()
 
 # Export targets

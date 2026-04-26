@@ -2,7 +2,7 @@
 #define GLR_H
 
 /**
- * @mainpage LibGLR: Generalized LR Parser Library
+ * @page glr_api_overview LibGLR API Overview
  *
  * LibGLR is a C library that provides facilities for implementing
  * Generalized LR (GLR) parsers. It is part of the TwinBooks project.
