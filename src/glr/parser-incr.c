@@ -1,8 +1,8 @@
-// src/glr/parser_inc.c
+// src/glr/parser-incr.c
 #include <glr/parser.h>
 #include <glr/cache.h>
 #include <glr/diff.h>
-#include <glr/forest_merge.h>
+#include <glr/forest-merge.h>
 #include <glr/dependency.h>
 #include <string.h>
 #include <stdlib.h>

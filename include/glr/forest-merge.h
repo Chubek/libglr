@@ -10,7 +10,7 @@ extern "C" {
 #endif
 
 /**
- * @file forest_merge.h
+ * @file forest-merge.h
  * @brief Forest merging for incremental parsing
  * 
  * Provides functions to merge parse forests from unchanged regions

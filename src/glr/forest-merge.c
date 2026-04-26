@@ -1,4 +1,4 @@
-#include <glr/forest_merge.h>
+#include <glr/forest-merge.h>
 #include <glr/forest.h>
 #include <stdlib.h>
 #include <string.h>
