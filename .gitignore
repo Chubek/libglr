@@ -17,6 +17,7 @@ Thumbs.db
 build/
 build-*/
 cmake-build-*/
+build_*
 out/
 bin/
 lib/
@@ -216,8 +217,16 @@ lcov.info
 third_party/*
 !third_party/.gitkeep
 
-# AGENTS
-AGENTS.md
+# Markdown files
+!README.md
+!GUIDE.md
+!INSTALL.md
+!BINDINGS.md
+!WRAPPERS.md
+!MOOSEPAW.md
+!DEPENDENCIES.md
+
+*.md
 
 # Bindings
 _bindings_
