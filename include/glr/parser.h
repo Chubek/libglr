@@ -213,5 +213,83 @@ extern "C"
 
 const char *glr_version (void);
 const char *glr_name (void);
+#ifdef HAVE_LMDB
+/* Forward declarations for cache types */
+struct glr_cache_t;
+struct glr_cache_stats_t;
+
+/**
+ * @brief Set cache for incremental parsing
+ * 
+ * @param parser Parser instance
+ * @param cache Cache handle (can be NULL to disable caching)
+ */
+void glr_parser_set_cache(glr_parser_t* parser, struct glr_cache_t* cache);
+
+/**
+ * @brief Get current cache handle
+ * 
+ * @param parser Parser instance
+ * @return Cache handle or NULL
+ */
+struct glr_cache_t* glr_parser_get_cache(const glr_parser_t* parser);
+
+/**
+ * @brief Enable incremental parsing with automatic cache setup
+ * 
+ * @param parser Parser instance
+ * @param cache_path Path to cache directory
+ * @return 0 on success, -1 on error
+ */
+int glr_parser_enable_incremental(glr_parser_t* parser, const char* cache_path);
+
+/**
+ * @brief Disable incremental parsing and close cache
+ * 
+ * @param parser Parser instance
+ */
+void glr_parser_disable_incremental(glr_parser_t* parser);
+
+/**
+ * @brief Get cache statistics
+ * 
+ * @param parser Parser instance
+ * @param stats Output statistics structure
+ * @return 0 on success, -1 on error
+ */
+int glr_parser_get_cache_stats(glr_parser_t* parser, struct glr_cache_stats_t* stats);
+
+#endif /* HAVE_LMDB */
+
+/**
+ * @brief Parse incrementally (reuse previous parse results)
+ * 
+ * This function performs incremental parsing by reusing parse results
+ * from unchanged regions of the input. It's significantly faster than
+ * full parsing for small edits.
+ * 
+ * @param parser Parser instance
+ * @param old_forest Previous parse forest (can be NULL for full parse)
+ * @param old_content Previous source content (can be NULL for full parse)
+ * @param old_len Length of old content
+ * @param new_content New source content
+ * @param new_len Length of new content
+ * @param edit_start Start offset of edit (0 if unknown, will auto-detect)
+ * @param edit_end End offset of edit in old content (0 if unknown)
+ * @param out_forest Output parse forest
+ * @return 0 on success, -1 on error
+ */
+int glr_parser_parse_incremental(glr_parser_t* parser,
+                                  const glr_forest_t* old_forest,
+                                  const char* old_content,
+                                  size_t old_len,
+                                  const char* new_content,
+                                  size_t new_len,
+                                  size_t edit_start,
+                                  size_t edit_end,
+                                  glr_forest_t** out_forest);
+
+const char *glr_version (void);
+const char *glr_name (void);
 
 #endif /* GLR_PARSER_H */

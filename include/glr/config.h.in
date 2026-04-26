@@ -1,0 +1,7 @@
+#ifndef GLR_CONFIG_H
+#define GLR_CONFIG_H
+
+/* Define to 1 if LMDB is available for incremental parsing cache */
+#cmakedefine HAVE_LMDB @HAVE_LMDB@
+
+#endif /* GLR_CONFIG_H */

@@ -68,3 +68,11 @@ add_custom_target(check-verbose
     COMMAND ${CMAKE_CTEST_COMMAND} -V
     DEPENDS check
     USES_TERMINAL)
+
+# Catch2 tests for incremental parsing
+if(BUILD_TESTS)
+    add_subdirectory(catch2)
+endif()
+
+# AFL fuzzing targets
+add_subdirectory(fuzz)
