@@ -1,6 +1,7 @@
 :root {
   --dracula-bg: #282a36;
   --dracula-current: #44475a;
+  --dracula-selection: #44475a;
   --dracula-fg: #f8f8f2;
   --dracula-comment: #6272a4;
   --dracula-cyan: #8be9fd;
@@ -12,40 +13,94 @@
   --dracula-yellow: #f1fa8c;
 }
 
-body, table, div, p, dl {
+html, body {
   background: var(--dracula-bg);
+  color: var(--dracula-fg);
+}
+
+body, table, div, p, dl, #doc-content {
   color: var(--dracula-fg);
   font-family: "Iosevka", "Fira Code", "DejaVu Sans Mono", monospace;
 }
 
-a, a:visited, .contents a:visited { color: var(--dracula-cyan); }
-a:hover { color: var(--dracula-green); }
+a, a:visited, .contents a:visited, a.el, a.elRef {
+  color: var(--dracula-cyan);
+}
 
-#titlearea, #nav-tree, #side-nav, .tabs, .tabs2, .tabs3, .header, .memtitle,
-.memproto, .memdoc, .directory, .directory tr.even, .directory tr.odd {
+a:hover {
+  color: var(--dracula-green);
+  text-decoration: underline;
+}
+
+#titlearea, #top, #nav-tree, #side-nav, .ui-resizable-handle,
+.tabs, .tabs2, .tabs3, .navpath ul {
   background: var(--dracula-current);
   color: var(--dracula-fg);
   border-color: var(--dracula-comment);
 }
 
-.title, h1, h2, h3, h4, h5, h6 { color: var(--dracula-pink); }
-.keyword, .keywordtype, .keywordflow { color: var(--dracula-pink); }
-.stringliteral { color: var(--dracula-yellow); }
-.comment { color: var(--dracula-comment); }
-
-code, pre.fragment, div.fragment {
-  background: #1f2030;
+#projectname, #projectnumber, #projectbrief, #projecttagline {
   color: var(--dracula-fg);
-  border: 1px solid var(--dracula-current);
-  border-radius: 8px;
 }
 
-.memname, .paramname, .el { color: var(--dracula-purple); }
-.params .paramname { color: var(--dracula-orange); }
-.success, .mlabel { background: var(--dracula-purple); color: var(--dracula-bg); }
+#projectname {
+  color: var(--dracula-pink);
+  font-weight: 700;
+}
+
+#projecttagline {
+  color: var(--dracula-comment);
+  margin-top: 0.25rem;
+}
+
+.title, h1, h2, h3, h4, h5, h6, legend {
+  color: var(--dracula-pink);
+}
+
+.header, .contents, .textblock, .memdoc, .memproto, .memtitle,
+.directory, .directory tr.even, .directory tr.odd, table.memberdecls {
+  background: var(--dracula-bg);
+  color: var(--dracula-fg);
+  border-color: var(--dracula-comment);
+}
+
+.memtitle, .memproto {
+  background: #343746;
+}
+
+.memname, .paramname, .el, .mlabel {
+  color: var(--dracula-purple);
+}
+
+.keyword, .keywordtype, .keywordflow {
+  color: var(--dracula-pink);
+}
+
+.stringliteral {
+  color: var(--dracula-yellow);
+}
+
+.comment, .comment a {
+  color: var(--dracula-comment);
+}
+
+code, pre.fragment, div.fragment, .line, .tt, .fragment {
+  background: #1f2030;
+  color: var(--dracula-fg);
+  border-color: var(--dracula-current);
+}
 
 #MSearchBox, #MSearchField, input, select {
   background: #1f2030;
   color: var(--dracula-fg);
   border: 1px solid var(--dracula-comment);
+}
+
+#nav-tree .selected, #nav-tree .selected a, .tablist li.current a {
+  background: var(--dracula-purple);
+  color: var(--dracula-bg);
+}
+
+.arrow, .icon, .icondoc, .iconfopen, .iconfclosed {
+  filter: brightness(1.35);
 }

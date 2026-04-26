@@ -1,15 +1,60 @@
-<!DOCTYPE html>
-<html lang="en">
+<!-- HTML header for Doxygen. Keep Doxygen placeholders/scripts intact so menu, search, and sidebar work. -->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "https://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="$langISO">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>$title</title>
-<link rel="stylesheet" href="$relpath^stylesheet.css">
+<meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=11"/>
+<meta name="generator" content="Doxygen $doxygenversion"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<!--BEGIN PROJECT_NAME--><title>$projectname: $title</title><!--END PROJECT_NAME-->
+<!--BEGIN !PROJECT_NAME--><title>$title</title><!--END !PROJECT_NAME-->
+<link href="$relpath^tabs.css" rel="stylesheet" type="text/css"/>
+<!--BEGIN FULL_SIDEBAR-->
+<script type="text/javascript">var page_layout=1;</script>
+<!--END FULL_SIDEBAR-->
+<script type="text/javascript" src="$relpath^jquery.js"></script>
+<script type="text/javascript" src="$relpath^dynsections.js"></script>
+<!--BEGIN COPY_CLIPBOARD-->
+<script type="text/javascript" src="$relpath^clipboard.js"></script>
+<!--END COPY_CLIPBOARD-->
+$treeview
+$search
+$mathjax
+$darkmode
+<link href="$relpath^$stylesheet" rel="stylesheet" type="text/css" />
+$extrastylesheet
 </head>
 <body>
-<header id="titlearea">
-  <div class="headertitle">
-    <div class="title">libglr</div>
-    <div class="summary">Generalized LR parsing, forests, rewrites, and incremental parsing</div>
-  </div>
-</header>
+<!--BEGIN FULL_SIDEBAR-->
+<div id="side-nav" class="ui-resizable side-nav-resizable">
+<!--END FULL_SIDEBAR-->
+<div id="top">
+<!--BEGIN TITLEAREA-->
+<div id="titlearea">
+<table cellspacing="0" cellpadding="0">
+ <tbody>
+ <tr id="projectrow">
+  <!--BEGIN PROJECT_LOGO-->
+  <td id="projectlogo"><img alt="Logo" src="$relpath^$projectlogo"$logosize/></td>
+  <!--END PROJECT_LOGO-->
+  <td id="projectalign">
+   <div id="projectname">$projectname<!--BEGIN PROJECT_NUMBER--><span id="projectnumber">&#160;$projectnumber</span><!--END PROJECT_NUMBER--></div>
+   <!--BEGIN PROJECT_BRIEF--><div id="projectbrief">$projectbrief</div><!--END PROJECT_BRIEF-->
+   <div id="projecttagline">Generalized LR parsing, forests, rewrites, and incremental parsing</div>
+  </td>
+  <!--BEGIN SEARCHENGINE-->
+   <!--BEGIN !FULL_SIDEBAR-->
+  <td>$searchbox</td>
+   <!--END !FULL_SIDEBAR-->
+  <!--END SEARCHENGINE-->
+ </tr>
+ <!--BEGIN SEARCHENGINE-->
+  <!--BEGIN FULL_SIDEBAR-->
+  <tr><td colspan="2">$searchbox</td></tr>
+  <!--END FULL_SIDEBAR-->
+ <!--END SEARCHENGINE-->
+ </tbody>
+</table>
+</div>
+<!--END TITLEAREA-->
+<!-- end header part -->
