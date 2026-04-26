@@ -2,6 +2,7 @@ set(GLRPP_TEST_SOURCES
     test_ast.cpp
     test_dsl.cpp
     test_grammar.cpp
+    test_incremental.cpp
     test_meta.cpp
     test_parser.cpp)
 

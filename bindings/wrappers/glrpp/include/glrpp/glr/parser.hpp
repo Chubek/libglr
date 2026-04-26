@@ -6,12 +6,14 @@
 #pragma once
 
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include <glrpp/cache.hpp>
 #include <glrpp/dsl/grammar.hpp>
 #include <glrpp/dsl/scanner.hpp>
 #include <glrpp/dsl/token.hpp>
@@ -32,6 +34,7 @@ class parser {
   }
 
   ~parser() {
+    shutdown_incremental_cache();
     if (native_parser_ != nullptr) {
       context::api().parser_destroy(native_parser_);
     }
@@ -85,12 +88,102 @@ class parser {
     return forest(result.forest, native_grammar_, std::shared_ptr<void>(native_parser_, [](void*) {}));
   }
 
+#if GLRPP_HAS_LMDB_CACHE
+  void enable_incremental(const std::string& cache_path) {
+    if (native_parser_ == nullptr) {
+      throw std::runtime_error("glrpp: parser backend is unavailable");
+    }
+    const auto& api = context::api();
+    if (api.parser_enable_incremental == nullptr) {
+      throw std::runtime_error("glrpp: incremental parsing is unavailable in the loaded libglr runtime");
+    }
+    shutdown_incremental_cache();
+    if (api.parser_enable_incremental(native_parser_, cache_path.c_str()) != 0) {
+      throw std::runtime_error("glrpp: failed to enable incremental parsing");
+    }
+    runtime_cache_enabled_ = true;
+  }
+
+  void enable_incremental(const cache_config& config) {
+    if (native_parser_ == nullptr) {
+      throw std::runtime_error("glrpp: parser backend is unavailable");
+    }
+    const auto& api = context::api();
+    if (api.parser_set_cache == nullptr) {
+      throw std::runtime_error("glrpp: incremental parsing is unavailable in the loaded libglr runtime");
+    }
+    shutdown_incremental_cache();
+    cache_ = std::make_unique<cache>(config);
+    api.parser_set_cache(native_parser_, cache_->native_handle());
+  }
+
+  void disable_incremental() { shutdown_incremental_cache(); }
+
+  [[nodiscard]] cache_stats get_cache_stats() const {
+    const auto& api = context::api();
+    if (api.parser_get_cache_stats != nullptr) {
+      glr_cache_stats_t native_stats{};
+      if (api.parser_get_cache_stats(native_parser_, &native_stats) == 0) {
+        return cache_stats(native_stats);
+      }
+    }
+    if (cache_) {
+      return cache_->get_stats();
+    }
+    throw std::runtime_error("glrpp: cache statistics are unavailable");
+  }
+#endif
+
+  [[nodiscard]] util::expected<forest, util::parse_diagnostic> parse_incremental(const forest* old_forest,
+                                                                                  std::string_view old_content,
+                                                                                  std::string_view new_content,
+                                                                                  std::size_t edit_start = 0,
+                                                                                  std::size_t edit_end = 0) const {
+    if (native_parser_ == nullptr) {
+      return util::unexpected<util::parse_diagnostic>{{"libglr runtime is unavailable", "loaded libglr", "<none>", {0, 1, 1}, 0}};
+    }
+
+    std::string old_storage;
+    std::string new_storage;
+    const char* old_data = old_forest != nullptr ? old_content.data() : nullptr;
+    std::size_t old_size = old_forest != nullptr ? old_content.size() : 0;
+    const char* new_data = new_content.data();
+    std::size_t new_size = new_content.size();
+
+    if (scanner_ != nullptr) {
+      if (old_forest != nullptr) {
+        old_storage = detail::utf8_to_utf16le_bytes(old_content, true);
+        old_data = old_storage.data();
+        old_size = old_storage.size();
+      }
+      new_storage = detail::utf8_to_utf16le_bytes(new_content, true);
+      new_data = new_storage.data();
+      new_size = new_storage.size();
+    }
+
+    glr_forest_t* result = nullptr;
+    const auto rc = context::api().parser_parse_incremental(native_parser_,
+                                                            old_forest != nullptr ? old_forest->native_handle() : nullptr,
+                                                            old_data, old_size, new_data, new_size, edit_start, edit_end, &result);
+
+    if (rc != 0 || result == nullptr) {
+      return util::unexpected<util::parse_diagnostic>{{"incremental parse failed", grammar_.start(), "<unknown>", {edit_start, 1, edit_start + 1},
+                                                       edit_start}};
+    }
+
+    return forest(result, native_grammar_, std::shared_ptr<void>(native_parser_, [](void*) {}));
+  }
+
  private:
   dsl::grammar grammar_;
   std::shared_ptr<dsl::scanner> scanner_;
   glr_grammar_t* native_grammar_ = nullptr;
   glr_parser_t* native_parser_ = nullptr;
   glr_lexer_hooks_t* lexer_hooks_ = nullptr;
+#if GLRPP_HAS_LMDB_CACHE
+  std::unique_ptr<cache> cache_;
+  bool runtime_cache_enabled_ = false;
+#endif
 
   void initialize_backend() {
     const auto& api = context::api();
@@ -231,6 +324,32 @@ class parser {
     }
     return buffer;
   }
+
+#if GLRPP_HAS_LMDB_CACHE
+  void shutdown_incremental_cache() noexcept {
+    if (native_parser_ == nullptr) {
+      cache_.reset();
+      runtime_cache_enabled_ = false;
+      return;
+    }
+
+    const auto& api = context::api();
+    if (runtime_cache_enabled_) {
+      if (api.parser_disable_incremental != nullptr) {
+        api.parser_disable_incremental(native_parser_);
+      } else if (api.parser_set_cache != nullptr) {
+        api.parser_set_cache(native_parser_, nullptr);
+      }
+    } else if (cache_ && api.parser_set_cache != nullptr) {
+      api.parser_set_cache(native_parser_, nullptr);
+    }
+
+    cache_.reset();
+    runtime_cache_enabled_ = false;
+  }
+#else
+  void shutdown_incremental_cache() noexcept {}
+#endif
 
 
   [[nodiscard]] util::parse_diagnostic make_diagnostic(glr_parse_error_t error, std::size_t position,

@@ -47,6 +47,10 @@ if(CMAKE_DL_LIBS)
     target_link_libraries(glrpp INTERFACE $<INSTALL_INTERFACE:${CMAKE_DL_LIBS}>)
 endif()
 
+if(HAVE_LMDB)
+    target_compile_definitions(glrpp INTERFACE HAVE_LMDB=1)
+endif()
+
 if(GLRPP_INSTALL)
     install(
         DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/glrpp

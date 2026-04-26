@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <glrpp/cache.hpp>
 #include <glrpp/config.hpp>
 #include <glrpp/dsl/dsl.hpp>
 #include <glrpp/glr/glr.hpp>

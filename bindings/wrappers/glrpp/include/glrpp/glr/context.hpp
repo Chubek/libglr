@@ -13,6 +13,9 @@
 #include <glrpp/config.hpp>
 
 extern "C" {
+#if GLRPP_HAS_LMDB_CACHE
+#include <glr/cache.h>
+#endif
 #include <glr/forest.h>
 #include <glr/grammar.h>
 #include <glr/lexer-hooks.h>
@@ -33,7 +36,22 @@ struct runtime_api final {
   using parser_create_fn = glr_parser_t* (*)(glr_grammar_t*);
   using parser_destroy_fn = void (*)(glr_parser_t*);
   using parse_fn = glr_parse_result_t (*)(glr_parser_t*, const char*, size_t);
+  using parser_parse_incremental_fn = int (*)(glr_parser_t*, const glr_forest_t*, const char*, size_t, const char*, size_t,
+                                              size_t, size_t, glr_forest_t**);
   using parser_set_lexer_hooks_fn = int (*)(glr_parser_t*, glr_lexer_hooks_t*);
+#if GLRPP_HAS_LMDB_CACHE
+  using parser_set_cache_fn = void (*)(glr_parser_t*, glr_cache_t*);
+  using parser_get_cache_fn = glr_cache_t* (*)(const glr_parser_t*);
+  using parser_enable_incremental_fn = int (*)(glr_parser_t*, const char*);
+  using parser_disable_incremental_fn = void (*)(glr_parser_t*);
+  using parser_get_cache_stats_fn = int (*)(glr_parser_t*, glr_cache_stats_t*);
+  using cache_open_fn = glr_cache_t* (*)(const glr_cache_config_t*);
+  using cache_close_fn = void (*)(glr_cache_t*);
+  using cache_sync_fn = int (*)(glr_cache_t*);
+  using cache_get_stats_fn = int (*)(glr_cache_t*, glr_cache_stats_t*);
+  using cache_clear_fn = int (*)(glr_cache_t*);
+  using cache_vacuum_fn = int (*)(glr_cache_t*);
+#endif
   using lexer_hooks_create_fn = glr_lexer_hooks_t* (*)();
   using lexer_hooks_destroy_fn = void (*)(glr_lexer_hooks_t*);
   using lexer_hooks_add_fn = int (*)(glr_lexer_hooks_t*, const char*, int, glr_lexer_hook_fn, void*, glr_lexer_hook_destroy_fn);
@@ -57,7 +75,21 @@ struct runtime_api final {
   parser_create_fn parser_create = nullptr;
   parser_destroy_fn parser_destroy = nullptr;
   parse_fn parse = nullptr;
+  parser_parse_incremental_fn parser_parse_incremental = nullptr;
   parser_set_lexer_hooks_fn parser_set_lexer_hooks = nullptr;
+#if GLRPP_HAS_LMDB_CACHE
+  parser_set_cache_fn parser_set_cache = nullptr;
+  parser_get_cache_fn parser_get_cache = nullptr;
+  parser_enable_incremental_fn parser_enable_incremental = nullptr;
+  parser_disable_incremental_fn parser_disable_incremental = nullptr;
+  parser_get_cache_stats_fn parser_get_cache_stats = nullptr;
+  cache_open_fn cache_open = nullptr;
+  cache_close_fn cache_close = nullptr;
+  cache_sync_fn cache_sync = nullptr;
+  cache_get_stats_fn cache_get_stats = nullptr;
+  cache_clear_fn cache_clear = nullptr;
+  cache_vacuum_fn cache_vacuum = nullptr;
+#endif
   lexer_hooks_create_fn lexer_hooks_create = nullptr;
   lexer_hooks_destroy_fn lexer_hooks_destroy = nullptr;
   lexer_hooks_add_fn lexer_hooks_add = nullptr;
@@ -117,7 +149,24 @@ class context {
       api_.parser_create = load_symbol<runtime_api::parser_create_fn>("glr_parser_create");
       api_.parser_destroy = load_symbol<runtime_api::parser_destroy_fn>("glr_parser_destroy");
       api_.parse = load_symbol<runtime_api::parse_fn>("glr_parse");
+      api_.parser_parse_incremental = load_symbol<runtime_api::parser_parse_incremental_fn>("glr_parser_parse_incremental");
       api_.parser_set_lexer_hooks = load_symbol<runtime_api::parser_set_lexer_hooks_fn>("glr_parser_set_lexer_hooks");
+#if GLRPP_HAS_LMDB_CACHE
+      api_.parser_set_cache = try_load_symbol<runtime_api::parser_set_cache_fn>("glr_parser_set_cache");
+      api_.parser_get_cache = try_load_symbol<runtime_api::parser_get_cache_fn>("glr_parser_get_cache");
+      api_.parser_enable_incremental =
+          try_load_symbol<runtime_api::parser_enable_incremental_fn>("glr_parser_enable_incremental");
+      api_.parser_disable_incremental =
+          try_load_symbol<runtime_api::parser_disable_incremental_fn>("glr_parser_disable_incremental");
+      api_.parser_get_cache_stats =
+          try_load_symbol<runtime_api::parser_get_cache_stats_fn>("glr_parser_get_cache_stats");
+      api_.cache_open = try_load_symbol<runtime_api::cache_open_fn>("glr_cache_open");
+      api_.cache_close = try_load_symbol<runtime_api::cache_close_fn>("glr_cache_close");
+      api_.cache_sync = try_load_symbol<runtime_api::cache_sync_fn>("glr_cache_sync");
+      api_.cache_get_stats = try_load_symbol<runtime_api::cache_get_stats_fn>("glr_cache_get_stats");
+      api_.cache_clear = try_load_symbol<runtime_api::cache_clear_fn>("glr_cache_clear");
+      api_.cache_vacuum = try_load_symbol<runtime_api::cache_vacuum_fn>("glr_cache_vacuum");
+#endif
       api_.lexer_hooks_create = load_symbol<runtime_api::lexer_hooks_create_fn>("glr_lexer_hooks_create");
       api_.lexer_hooks_destroy = load_symbol<runtime_api::lexer_hooks_destroy_fn>("glr_lexer_hooks_destroy");
       api_.lexer_hooks_add = load_symbol<runtime_api::lexer_hooks_add_fn>("glr_lexer_hooks_add");
@@ -141,6 +190,16 @@ class context {
       const char* error = lt_dlerror();
       throw std::runtime_error(std::string("glrpp: missing symbol ") + name +
                                (error ? std::string(" (") + error + ")" : std::string{}));
+    }
+    return reinterpret_cast<Fn>(symbol);
+  }
+
+  template <typename Fn>
+  [[nodiscard]] Fn try_load_symbol(const char* name) {
+    auto* symbol = lt_dlsym(handle_, name);
+    if (symbol == nullptr) {
+      (void)lt_dlerror();
+      return nullptr;
     }
     return reinterpret_cast<Fn>(symbol);
   }

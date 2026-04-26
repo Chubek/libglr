@@ -26,6 +26,7 @@ class forest {
   [[nodiscard]] std::size_t size() const noexcept { return roots_.size(); }
   [[nodiscard]] const std::vector<node>& roots() const noexcept { return roots_; }
   [[nodiscard]] const node& front() const { return roots_.front(); }
+  [[nodiscard]] glr_forest_t* native_handle() const noexcept { return static_cast<glr_forest_t*>(native_); }
 
  private:
   std::vector<node> roots_;

@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <glrpp/cache.hpp>
 #include <glrpp/glr/context.hpp>
 #include <glrpp/glr/forest.hpp>
 #include <glrpp/glr/node.hpp>
