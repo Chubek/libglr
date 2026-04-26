@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# libglr SWIG Binding Generator with Cache API and LMDB support
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
@@ -10,7 +11,7 @@ show_help() {
   cat <<'USAGE'
 Usage: bindings/generate-bindings.sh [options]
 
-Generate SWIG bindings into directories named `_bindings_libglr_<language>`.
+Generate SWIG bindings (with optional Cache API/LMDB support) into directories named `_bindings_libglr_<language>`.
 Directories are created in the repository root by default.
 
 Options:
@@ -29,6 +30,7 @@ Options:
   --zlib              Use zlib archives.
   --bzip2             Use bzip2 archives.
   --pacman            Use pacman archives.
+  --with-cache        Include Cache API bindings (requires LMDB).
   -h, --help          Show this help.
 
 Notes:
@@ -190,6 +192,13 @@ copy_runtime_assets() {
     cp "$shared_lib" "$runtime_dir/"
   else
     warn "no built libglr shared/static library found under build/"
+\n  # Copy LMDB library if cache support is enabled
+  lmdb_lib=$(find /usr/lib /usr/local/lib -maxdepth 2 -type f \( -name 'liblmdb.so*' -o -name 'liblmdb.dylib' -o -name 'liblmdb.a' \) 2>/dev/null | head -n 1 || true)
+  if [[ -n "$lmdb_lib" ]]; then
+    cp "$lmdb_lib" "$runtime_dir/" 2>/dev/null || warn "could not copy LMDB library"
+  else
+    warn "LMDB library not found; cache API may require manual LMDB installation"
+  fi
   fi
 }
 
@@ -205,6 +214,9 @@ This directory contains SWIG-generated low-level bindings for libglr.
 - Generated from `bindings/libglr.i`
 - Intended as a thin FFI layer for higher-level wrappers.
 - Helper accessors prefixed with `glr_binding_` smooth over C arrays and unions.
+\n## Cache API Support
+If libglr was built with `ENABLE_CACHE=ON`, these bindings include the incremental parsing Cache API.
+This requires LMDB (Lightning Memory-Mapped Database) to be installed on the target system.
 - `Makefile` builds and installs the binding with the language toolchain when supported.
 EOF2
   python3 - "$target_dir/README.md" "$language" <<'PYEOF'
@@ -584,7 +596,16 @@ generate_language() {
   fi
 
   log "generating $language bindings in $target_dir"
-  if ! swig -I"$REPO_ROOT/include" -I"$REPO_ROOT/third_party" -o "$swig_output" \
+  # Add cache support flag if LMDB is available
+  local lmdb_flag=""
+  if command_exists pkg-config && pkg-config --exists lmdb 2>/dev/null; then
+    lmdb_flag="-DHAVE_LMDB"
+    log "  including Cache API bindings (LMDB detected)"
+  else
+    warn "  LMDB not detected; Cache API bindings will be excluded"
+  fi
+
+  if ! swig -I"$REPO_ROOT/include" -I"$REPO_ROOT/third_party" $lmdb_flag -o "$swig_output" \
       -outdir "$target_dir" "-${language}" "${swig_opts[@]}" "$INTERFACE_FILE"; then
     rm -rf "$target_dir"
     return 1
@@ -625,6 +646,7 @@ git_requested=0
 doc_requested=0
 examples_requested=0
 output_root="$DEFAULT_OUTPUT_ROOT"
+with_cache=0
 all_requested=0
 languages=()
 
@@ -692,6 +714,10 @@ while [[ $# -gt 0 ]]; do
       archive_format="pacman"
       shift
       ;;
+    --with-cache)
+      with_cache=1
+      shift
+      ;;
     -h|--help)
       show_help
       exit 0
@@ -704,6 +730,12 @@ done
 
 if ! command_exists swig; then
   fail "swig is required to generate bindings"
+fi
+\n# Check for LMDB if cache support is requested
+if [[ "$with_cache" == "1" ]]; then
+  if ! command_exists pkg-config || ! pkg-config --exists lmdb 2>/dev/null; then
+    warn "LMDB not found; cache API bindings will be excluded"
+  fi
 fi
 
 if [[ ! -f "$INTERFACE_FILE" ]]; then
