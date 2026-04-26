@@ -11,6 +11,9 @@
 #include <glr/parser.h>
 #include <glr/reader.h>
 #include <glr/reduction.h>
+#ifdef HAVE_LMDB
+#include <glr/cache.h>
+#endif
 #include <glr/rewrite.h>
 #include <glr/stack.h>
 %}
@@ -79,7 +82,11 @@ using System.Runtime.InteropServices;
 %newobject glr_parser_create;
 %newobject glr_reader_create;
 %newobject glr_lexer_hooks_create;
-%newobject glr_rewrite_program_create;
+
+#ifdef HAVE_LMDB
+%newobject glr_cache_open;
+#endif
+
 %newobject glr_rewrite_program_parse;
 %newobject glr_rewrite_program_load_file;
 %newobject glr_disambig_hook_create;
@@ -418,6 +425,46 @@ glr_binding_rewrite_program_add_rule_kind (glr_rewrite_program_t *program,
 }
 %}
 
+
+#ifdef HAVE_LMDB
+/* Cache helper functions */
+static glr_cache_config_t
+glr_binding_cache_config_create (const char *lmdb_path,
+                                 size_t map_size,
+                                 uint32_t max_readers,
+                                 bool use_async,
+                                 uint64_t ttl_seconds)
+{
+  glr_cache_config_t config;
+  config.lmdb_path = lmdb_path;
+  config.map_size = map_size;
+  config.max_readers = max_readers;
+  config.use_async = use_async;
+  config.ttl_seconds = ttl_seconds;
+  return config;
+}
+
+static glr_cache_config_t
+glr_binding_cache_config_default (void)
+{
+  return GLR_CACHE_DEFAULT_CONFIG;
+}
+
+static double
+glr_binding_cache_stats_hit_rate (const glr_cache_stats_t *stats)
+{
+  if (stats == NULL)
+    {
+      return 0.0;
+    }
+  
+  uint64_t total_hits = stats->forest_hits + stats->gss_hits + stats->subtree_hits;
+  uint64_t total_misses = stats->forest_misses + stats->gss_misses + stats->subtree_misses;
+  uint64_t total = total_hits + total_misses;
+  
+  return total > 0 ? (double)total_hits / (double)total : 0.0;
+}
+#endif /* HAVE_LMDB */
 /* Public headers. */
 %include "glr/grammar.h"
 %include "glr/forest.h"
@@ -430,3 +477,8 @@ glr_binding_rewrite_program_add_rule_kind (glr_rewrite_program_t *program,
 %include "glr/rewrite.h"
 %include "glr/parser.h"
 %include "glr/glr.h"
+
+#ifdef HAVE_LMDB
+/* Cache API - only available when LMDB is enabled */
+%include "glr/cache.h"
+#endif
