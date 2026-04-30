@@ -5,8 +5,8 @@ OUTPUT_DIRECTORY       = "@LibGLR_OUTPUT_DIRECTORY@"
 OUTPUT_LANGUAGE        = English
 FULL_PATH_NAMES        = YES
 STRIP_FROM_PATH        = "@LibGLR_TOP_SRCDIR@"
-STRIP_FROM_INC_PATH    = "@LibGLR_STRIP_FROM_INC_PATH@"
-LAYOUT_FILE            = "@LibGLR_LAYOUT_FILE@"
+STRIP_FROM_INC_PATH    = "@LibGLR_TOP_SRCDIR@/include"
+LAYOUT_FILE            = "@LibGLR_TOP_SRCDIR@/layout.xml"
 
 INPUT                  = "@LibGLR_TOP_SRCDIR@/include/glr" \
 INPUT_ENCODING         = UTF-8
