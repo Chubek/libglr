@@ -17,15 +17,7 @@ option(ENABLE_DOXYGEN "Build documentation with Doxygen" ON)
 # Find Directories
 # -----------------------------------------------------------------------------
 
-set(DEFAULT_SHELL "bash")
-
-execute_process(
-	COMMAND ${DEFAULT_SHELL} "find-source-directory.sh"
-	OUTPUT_VARIABLE LibGLR_TOP_SRCDIR
-	OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
-message(STATUS "Found top source directory: ${LibGLR_TOP_SRCDIR}")	
+set(LibGLR_TOP_SRCDIR "${CMAKE_SOURCE_DIR}")
 
 # -----------------------------------------------------------------------------
 # Find Doxygen
@@ -87,11 +79,3 @@ add_custom_target(docs-clean
     COMMENT "Removing generated documentation"
 )
 
-# -----------------------------------------------------------------------------
-# Status output
-# -----------------------------------------------------------------------------
-
-message(STATUS "Doxygen enabled: ${ENABLE_DOXYGEN}")
-message(STATUS "Doxygen executable: ${DOXYGEN_EXECUTABLE}")
-message(STATUS "DOT found: ${LibGLR_HAVE_DOT}")
-message(STATUS "Docs output dir: ${LibGLR_OUTPUT_DIRECTORY}")
