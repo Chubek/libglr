@@ -1,6 +1,7 @@
 #ifndef GLR_GRAMMAR_H
 #define GLR_GRAMMAR_H
 
+#include <glr/parsetbl.h>
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -75,6 +76,8 @@ extern "C"
     size_t production_count;        ///< Number of productions
     glr_symbol_t *start_symbol;     ///< Grammar start symbol
     char *name;                     ///< Grammar name
+    glr_parse_table_t *parse_table; ///< Optional parse table for LR/GLR actions
+    bool owns_parse_table;          ///< Whether the grammar destroys parse_table
   } glr_grammar_t;
 
   /**
@@ -141,6 +144,30 @@ extern "C"
    */
   glr_production_t *glr_grammar_get_production (const glr_grammar_t *grammar,
                                                 int id);
+
+  /**
+   * @brief Attach an optional parse table to the grammar.
+   *
+   * Grammars can carry a precomputed parse table that parsers created from the
+   * grammar will use by default. Passing NULL clears any previously attached
+   * table.
+   *
+   * @param grammar Grammar to update
+   * @param parse_table Parse table to attach, or NULL to detach
+   * @param take_ownership true if the grammar should destroy the table
+   * @return 0 on success, -1 on invalid input
+   */
+  int glr_grammar_set_parse_table (glr_grammar_t *grammar,
+                                   glr_parse_table_t *parse_table,
+                                   bool take_ownership);
+
+  /**
+   * @brief Retrieve the parse table attached to a grammar.
+   *
+   * @param grammar Grammar to inspect
+   * @return Attached parse table, or NULL if none is configured
+   */
+  glr_parse_table_t *glr_grammar_get_parse_table (const glr_grammar_t *grammar);
 
   /**
    * @brief Check if a symbol is a terminal

@@ -36,6 +36,7 @@
 #include "grammar.h"
 #include "graph.h"
 #include "lexer-hooks.h"
+#include "parsetbl.h"
 #include "parser.h"
 #include "reader.h"
 #include "rewrite.h"

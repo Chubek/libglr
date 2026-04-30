@@ -25,6 +25,15 @@ static int shift_item (glr_parser_t *parser, int stack_idx);
 static int reduce_item (glr_parser_t *parser, int stack_idx);
 static void handle_conflict (glr_parser_t *parser);
 static int initialize_parser (glr_parser_t *parser);
+static glr_parse_table_t *get_active_parse_table (const glr_parser_t *parser);
+static int grammar_find_symbol_id (const glr_grammar_t *grammar,
+                                   const char *name,
+                                   glr_symbol_type_t type);
+static int parser_get_lookahead_symbol_id (const glr_parser_t *parser);
+static int parser_append_stack (glr_parser_t *parser, glr_stack_t *stack);
+static int parser_prune_stack (glr_parser_t *parser, size_t stack_idx);
+static int apply_reduction_action (glr_parser_t *parser, glr_stack_t *stack,
+                                   const glr_action_t *action);
 static int grammar_accepts_token (const glr_grammar_t *grammar,
                                    const char *name);
 static int should_use_reader (const char *input, size_t length);
@@ -66,6 +75,8 @@ glr_parser_create (glr_grammar_t *grammar)
   parser->forest = glr_forest_create ();
   parser->state_table = NULL;
   parser->state_table_size = 0;
+  parser->parse_table = NULL;
+  parser->owns_parse_table = false;
   parser->disambig_hooks = NULL;
 
   /* Initialize input tracking */
@@ -122,8 +133,12 @@ glr_parser_destroy (glr_parser_t *parser)
   /* Free parse forest */
   glr_forest_destroy (parser->forest);
 
-  /* Free state table and reader resources */
-  free (parser->state_table);
+  /* Free reader resources and any parser-owned parse table */
+  parser->state_table = NULL;
+  if (parser->owns_parse_table)
+    {
+      glr_parse_table_destroy (parser->parse_table);
+    }
   glr_reader_token_clear (&parser->lookahead);
   glr_reader_destroy (parser->reader);
 
@@ -199,14 +214,168 @@ initialize_parser (glr_parser_t *parser)
       return -1;
     }
 
-  /* Initialize state table if not already done */
-  if (parser->state_table == NULL)
-    {
-      /* TODO: Build LR state table from grammar */
-      parser->state_table_size = 0;
-    }
+  glr_parse_table_t *table = get_active_parse_table (parser);
+
+  parser->state_table = table != NULL ? (void **)table->states : NULL;
+  parser->state_table_size = table != NULL ? table->state_count : 0;
 
   return 0;
+}
+
+static glr_parse_table_t *
+get_active_parse_table (const glr_parser_t *parser)
+{
+  if (parser == NULL)
+    {
+      return NULL;
+    }
+
+  if (parser->parse_table != NULL)
+    {
+      return parser->parse_table;
+    }
+
+  return parser->grammar != NULL ? parser->grammar->parse_table : NULL;
+}
+
+static int
+grammar_find_symbol_id (const glr_grammar_t *grammar, const char *name,
+                        glr_symbol_type_t type)
+{
+  if (grammar == NULL || name == NULL)
+    {
+      return -1;
+    }
+
+  for (size_t i = 0; i < grammar->symbol_count; i++)
+    {
+      glr_symbol_t *symbol = grammar->symbols[i];
+      if (symbol != NULL && symbol->type == type && symbol->name != NULL
+          && strcmp (symbol->name, name) == 0)
+        {
+          return symbol->id;
+        }
+    }
+
+  return -1;
+}
+
+static int
+parser_get_lookahead_symbol_id (const glr_parser_t *parser)
+{
+  if (parser == NULL || parser->grammar == NULL || parser->input == NULL
+      || parser->input_pos == 0)
+    {
+      return -1;
+    }
+
+  if (parser->lookahead.terminal_name != NULL)
+    {
+      return grammar_find_symbol_id (parser->grammar,
+                                     parser->lookahead.terminal_name,
+                                     GLR_SYMBOL_TERMINAL);
+    }
+
+  char token_name[2];
+  token_name[0] = parser->input[parser->input_pos - 1];
+  token_name[1] = '\0';
+
+  return grammar_find_symbol_id (parser->grammar, token_name,
+                                 GLR_SYMBOL_TERMINAL);
+}
+
+static int
+parser_append_stack (glr_parser_t *parser, glr_stack_t *stack)
+{
+  if (parser == NULL || stack == NULL)
+    {
+      return -1;
+    }
+
+  if (parser->stack_count == parser->stack_capacity)
+    {
+      size_t new_capacity = parser->stack_capacity == 0 ? 4 : parser->stack_capacity * 2;
+      glr_stack_t **new_stacks
+          = realloc (parser->stacks, new_capacity * sizeof (*new_stacks));
+      if (new_stacks == NULL)
+        {
+          return -1;
+        }
+      parser->stacks = new_stacks;
+      parser->stack_capacity = new_capacity;
+    }
+
+  parser->stacks[parser->stack_count++] = stack;
+  return 0;
+}
+
+static int
+parser_prune_stack (glr_parser_t *parser, size_t stack_idx)
+{
+  if (parser == NULL || stack_idx >= parser->stack_count)
+    {
+      return -1;
+    }
+
+  glr_stack_destroy (parser->stacks[stack_idx]);
+  for (size_t i = stack_idx + 1; i < parser->stack_count; i++)
+    {
+      parser->stacks[i - 1] = parser->stacks[i];
+    }
+  parser->stack_count--;
+  return 0;
+}
+
+static int
+apply_reduction_action (glr_parser_t *parser, glr_stack_t *stack,
+                        const glr_action_t *action)
+{
+  if (parser == NULL || stack == NULL || action == NULL
+      || action->type != GLR_ACTION_REDUCE)
+    {
+      return -1;
+    }
+
+  glr_production_t *production
+      = glr_grammar_get_production (parser->grammar,
+                                    (int)action->reduce.production_id);
+  if (production == NULL)
+    {
+      return -1;
+    }
+
+  if (glr_stack_height (stack) < production->body_length)
+    {
+      return -1;
+    }
+
+  for (size_t i = 0; i < production->body_length; i++)
+    {
+      (void)glr_stack_pop (stack);
+    }
+
+  glr_parse_table_t *table = get_active_parse_table (parser);
+  if (table == NULL)
+    {
+      return 0;
+    }
+
+  uint32_t current_state = 0;
+  if (!glr_stack_empty (stack))
+    {
+      current_state = (uint32_t)(uintptr_t)glr_stack_peek (stack);
+    }
+
+  uint32_t next_state = 0;
+  if (glr_parse_table_get_goto (table, current_state,
+                                (uint32_t)production->head->id,
+                                &next_state)
+      != 0)
+    {
+      return -1;
+    }
+
+  return glr_stack_push (stack, (void *)(uintptr_t)next_state);
 }
 
 /**
@@ -371,24 +540,62 @@ shift_item (glr_parser_t *parser, int stack_idx)
       return -1;
     }
 
-  /* Get current state from stack top */
-  void *current_state = glr_stack_peek (stack);
-  if (current_state == NULL)
-    {
-      return -1;
-    }
-
-  /* Check if we've reached end of input */
-  if (parser->input_pos >= parser->input_length)
+  glr_parse_table_t *table = get_active_parse_table (parser);
+  if (table == NULL)
     {
       return 0;
     }
 
-  /* TODO: Implement shift logic using state table */
-  /* 1. Look up shift action in state table */
-  /* 2. Push input symbol onto stack */
-  /* 3. Transition to next state */
-  /* 4. Add node to parse forest */
+  int terminal_id = parser_get_lookahead_symbol_id (parser);
+  if (terminal_id < 0)
+    {
+      parser->error = GLR_PARSE_ERROR_SYNTAX;
+      return -1;
+    }
+
+  uint32_t current_state = glr_stack_empty (stack)
+                               ? 0
+                               : (uint32_t)(uintptr_t)glr_stack_peek (stack);
+  const glr_action_set_t *actions
+      = glr_parse_table_get_actions (table, current_state, (uint32_t)terminal_id);
+  if (actions == NULL || actions->action_count == 0)
+    {
+      parser->error = GLR_PARSE_ERROR_SYNTAX;
+      return -1;
+    }
+
+  for (size_t i = 0; i < actions->action_count; i++)
+    {
+      const glr_action_t *action = &actions->actions[i];
+      glr_stack_t *target = stack;
+
+      if (i > 0)
+        {
+          target = glr_stack_fork (stack, glr_stack_height (stack));
+          if (target == NULL || parser_append_stack (parser, target) != 0)
+            {
+              glr_stack_destroy (target);
+              parser->error = GLR_PARSE_ERROR_MEMORY;
+              return -1;
+            }
+        }
+
+      if (action->type == GLR_ACTION_SHIFT)
+        {
+          if (glr_stack_push (
+                  target,
+                  (void *)(uintptr_t)action->shift.next_state)
+              != 0)
+            {
+              parser->error = GLR_PARSE_ERROR_MEMORY;
+              return -1;
+            }
+        }
+      else if (action->type == GLR_ACTION_ACCEPT)
+        {
+          continue;
+        }
+    }
 
   return 0;
 }
@@ -418,12 +625,55 @@ reduce_item (glr_parser_t *parser, int stack_idx)
       return -1;
     }
 
-  /* TODO: Implement reduce logic */
-  /* 1. Determine which production to reduce by */
-  /* 2. Pop RHS symbols from stack */
-  /* 3. Create non-terminal node in forest */
-  /* 4. Push LHS non-terminal onto stack */
-  /* 5. Transition to goto state */
+  glr_parse_table_t *table = get_active_parse_table (parser);
+  if (table == NULL)
+    {
+      return 0;
+    }
+
+  int terminal_id = parser_get_lookahead_symbol_id (parser);
+  if (terminal_id < 0)
+    {
+      return 0;
+    }
+
+  uint32_t current_state = glr_stack_empty (stack)
+                               ? 0
+                               : (uint32_t)(uintptr_t)glr_stack_peek (stack);
+  const glr_action_set_t *actions
+      = glr_parse_table_get_actions (table, current_state, (uint32_t)terminal_id);
+  if (actions == NULL || actions->action_count == 0)
+    {
+      return 0;
+    }
+
+  for (size_t i = 0; i < actions->action_count; i++)
+    {
+      const glr_action_t *action = &actions->actions[i];
+      glr_stack_t *target = stack;
+
+      if (action->type != GLR_ACTION_REDUCE)
+        {
+          continue;
+        }
+
+      if (i > 0)
+        {
+          target = glr_stack_fork (stack, glr_stack_height (stack));
+          if (target == NULL || parser_append_stack (parser, target) != 0)
+            {
+              glr_stack_destroy (target);
+              parser->error = GLR_PARSE_ERROR_MEMORY;
+              return -1;
+            }
+        }
+
+      if (apply_reduction_action (parser, target, action) != 0)
+        {
+          parser->error = GLR_PARSE_ERROR_GRAMMAR;
+          return -1;
+        }
+    }
 
   return 0;
 }
@@ -523,6 +773,11 @@ parse_input (glr_parser_t *parser)
 
   parser->stack_count = 1;
   parser->stack_capacity = 1;
+  if (glr_stack_push (parser->stacks[0], (void *)(uintptr_t)0) != 0)
+    {
+      parser->error = GLR_PARSE_ERROR_MEMORY;
+      return -1;
+    }
 
   /* Configure reader for UTF-16 input if needed */
   if (should_use_reader (parser->input, parser->input_length))
@@ -551,10 +806,27 @@ parse_input (glr_parser_t *parser)
         }
 
       /* Perform shift and reduce on all active stacks */
-      for (size_t i = 0; i < parser->stack_count; i++)
+      for (size_t i = 0; i < parser->stack_count;)
         {
-          shift_item (parser, (int)i);
-          reduce_item (parser, (int)i);
+          if (reduce_item (parser, (int)i) != 0
+              || shift_item (parser, (int)i) != 0)
+            {
+              if (parser->error == GLR_PARSE_ERROR_MEMORY)
+                {
+                  return -1;
+                }
+              if (get_active_parse_table (parser) != NULL)
+                {
+                  parser_prune_stack (parser, i);
+                  if (parser->stack_count == 0)
+                    {
+                      return -1;
+                    }
+                  continue;
+                }
+            }
+
+          i++;
         }
 
       /* Handle any conflicts that arose */
@@ -676,6 +948,34 @@ glr_lexer_hooks_t *
 glr_parser_get_lexer_hooks (const glr_parser_t *parser)
 {
   return parser != NULL ? parser->lexer_hooks : NULL;
+}
+
+int
+glr_parser_set_parse_table (glr_parser_t *parser,
+                            glr_parse_table_t *parse_table,
+                            bool take_ownership)
+{
+  if (parser == NULL)
+    {
+      return -1;
+    }
+
+  if (parser->owns_parse_table && parser->parse_table != NULL
+      && parser->parse_table != parse_table)
+    {
+      glr_parse_table_destroy (parser->parse_table);
+    }
+
+  parser->parse_table = parse_table;
+  parser->owns_parse_table = parse_table != NULL && take_ownership;
+
+  return 0;
+}
+
+glr_parse_table_t *
+glr_parser_get_parse_table (const glr_parser_t *parser)
+{
+  return parser != NULL ? parser->parse_table : NULL;
 }
 
 /* ============================================================================

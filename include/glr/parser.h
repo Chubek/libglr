@@ -4,6 +4,7 @@
 #include <glr/forest.h>
 #include <glr/grammar.h>
 #include <glr/lexer-hooks.h>
+#include <glr/parsetbl.h>
 #include <glr/reader.h>
 #include <glr/reduction.h>
 #include <glr/stack.h>
@@ -88,6 +89,8 @@ extern "C"
     glr_forest_t *forest;                ///< Shared Packed Parse Forest (SPPF)
     void **state_table;                  ///< LR state transition table
     size_t state_table_size;             ///< Number of states in table
+    glr_parse_table_t *parse_table;      ///< Optional typed parse table override
+    bool owns_parse_table;               ///< Whether parser destroys parse_table
     glr_disambig_hook_t *disambig_hooks; ///< Chain of disambiguation hooks
     const char *input;                   ///< Current input buffer
     size_t input_pos;                    ///< Current byte position in input
@@ -209,6 +212,30 @@ extern "C"
    * @see glr_parser_set_lexer_hooks
    */
   glr_lexer_hooks_t *glr_parser_get_lexer_hooks (const glr_parser_t *parser);
+
+  /**
+   * @brief Override the parse table used by a parser.
+   *
+   * When no parser-specific table is configured, the parser falls back to the
+   * optional table attached to its grammar. Passing NULL clears the override
+   * and restores grammar-driven lookup.
+   *
+   * @param parser Parser instance
+   * @param parse_table Parse table override, or NULL to clear it
+   * @param take_ownership true if the parser should destroy the table
+   * @return 0 on success, -1 on invalid input
+   */
+  int glr_parser_set_parse_table (glr_parser_t *parser,
+                                  glr_parse_table_t *parse_table,
+                                  bool take_ownership);
+
+  /**
+   * @brief Get the active parser-specific parse table override.
+   *
+   * @param parser Parser instance
+   * @return Parser override table, or NULL if the parser uses the grammar table
+   */
+  glr_parse_table_t *glr_parser_get_parse_table (const glr_parser_t *parser);
 
   /* ========================================================================
    * Parser State Inspection

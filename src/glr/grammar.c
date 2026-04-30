@@ -18,6 +18,8 @@ glr_grammar_create (void)
   grammar->production_count = 0;
   grammar->start_symbol = NULL;
   grammar->name = NULL;
+  grammar->parse_table = NULL;
+  grammar->owns_parse_table = false;
 
   return grammar;
 }
@@ -56,6 +58,10 @@ glr_grammar_destroy (glr_grammar_t *grammar)
   free (grammar->productions);
 
   free (grammar->name);
+  if (grammar->owns_parse_table)
+    {
+      glr_parse_table_destroy (grammar->parse_table);
+    }
   free (grammar);
 }
 
@@ -206,4 +212,32 @@ glr_grammar_get_production (const glr_grammar_t *grammar, int id)
     }
 
   return grammar->productions[id];
+}
+
+int
+glr_grammar_set_parse_table (glr_grammar_t *grammar,
+                             glr_parse_table_t *parse_table,
+                             bool take_ownership)
+{
+  if (grammar == NULL)
+    {
+      return -1;
+    }
+
+  if (grammar->owns_parse_table && grammar->parse_table != NULL
+      && grammar->parse_table != parse_table)
+    {
+      glr_parse_table_destroy (grammar->parse_table);
+    }
+
+  grammar->parse_table = parse_table;
+  grammar->owns_parse_table = parse_table != NULL && take_ownership;
+
+  return 0;
+}
+
+glr_parse_table_t *
+glr_grammar_get_parse_table (const glr_grammar_t *grammar)
+{
+  return grammar != NULL ? grammar->parse_table : NULL;
 }
