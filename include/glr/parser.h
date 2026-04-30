@@ -10,17 +10,20 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-typedef struct glr_parser glr_parser_t;
-
-#include <glr/disambiguate.h>
-
 /**
  * @file parser.h
  * @brief GLR parser core infrastructure
  *
- * This module provides the main GLR parser implementation,
- * including the parsing loop, item set construction, and
- * ambiguity handling.
+ * This module provides the main GLR (Generalized LR) parser implementation
+ * based on Tomita's algorithm. It supports:
+ * - Graph-Structured Stack (GSS) for handling multiple parse paths
+ * - Shared Packed Parse Forest (SPPF) for representing ambiguous parses
+ * - Pluggable disambiguation strategies
+ * - UTF-8 and UTF-16 input support via reader hooks
+ * - Optional incremental parsing with caching (when compiled with LMDB support)
+ *
+ * The parser maintains multiple stacks simultaneously to handle grammar
+ * ambiguities and conflicts, merging results into a shared parse forest.
  */
 
 #ifdef __cplusplus
@@ -28,127 +31,212 @@ extern "C"
 {
 #endif
 
+  /* Forward declarations */
+  typedef struct glr_parser glr_parser_t;
+
+#include <glr/disambiguate.h>
+
   /**
    * @typedef glr_parse_error_t
-   * @brief Parser error codes
+   * @brief Error codes returned by parsing operations
    */
   typedef enum
   {
-    GLR_PARSE_SUCCESS,            ///< Parsing successful
-    GLR_PARSE_ERROR_SYNTAX,       ///< Syntax error
-    GLR_PARSE_ERROR_MEMORY,       ///< Memory allocation failed
-    GLR_PARSE_ERROR_GRAMMAR,      ///< Grammar error
-    GLR_PARSE_ERROR_UNRECOVERABLE ///< Unrecoverable parse error
+    GLR_PARSE_SUCCESS = 0,        ///< Parsing completed successfully
+    GLR_PARSE_ERROR_SYNTAX,       ///< Syntax error in input
+    GLR_PARSE_ERROR_MEMORY,       ///< Memory allocation failure
+    GLR_PARSE_ERROR_GRAMMAR,      ///< Invalid or malformed grammar
+    GLR_PARSE_ERROR_UNRECOVERABLE ///< Unrecoverable parse error (no valid paths)
   } glr_parse_error_t;
 
   /**
    * @struct glr_parse_result_t
-   * @brief Result of a parse operation
+   * @brief Complete result of a parsing operation
+   *
+   * Contains the parse forest (on success), error information,
+   * and the position reached in the input stream.
    */
   typedef struct
   {
-    glr_parse_error_t error; ///< Error code
-    glr_forest_t *forest;    ///< Parse forest (NULL on error)
-    size_t position;         ///< Parse position (input consumed)
-    void *user_data;         ///< User-provided data
+    glr_parse_error_t error; ///< Error code (GLR_PARSE_SUCCESS on success)
+    glr_forest_t *forest;    ///< Resulting parse forest (NULL on error)
+    size_t position;         ///< Number of bytes consumed from input
+    void *user_data;         ///< User-provided context data
   } glr_parse_result_t;
 
   /**
    * @struct glr_parser_t
-   * @brief GLR parser instance
+   * @brief Main GLR parser instance
    *
-   * Contains all state needed for GLR parsing, including
-   * multiple stacks for handling ambiguity.
+   * Encapsulates all state required for GLR parsing:
+   * - Grammar and state transition table
+   * - Multiple stacks (Graph-Structured Stack) for parallel parse paths
+   * - Shared parse forest for representing all valid parse trees
+   * - Input buffer and position tracking
+   * - Lexer hooks for custom tokenization
+   * - Disambiguation hooks for resolving conflicts
+   *
+   * The parser can be reused across multiple parse operations by calling
+   * glr_parser_reset() or glr_parse() (which resets automatically).
    */
   struct glr_parser
   {
-    glr_grammar_t *grammar;  ///< Grammar being parsed
-    glr_stack_t **stacks;    ///< Array of stacks (one per parse path)
-    size_t stack_count;      ///< Number of active stacks
-    size_t stack_capacity;   ///< Stack capacity
-    glr_forest_t *forest;    ///< Shared parse forest
-    void **state_table;      ///< State transition table
-    size_t state_table_size; ///< State table size
-    glr_disambig_hook_t *disambig_hooks; ///< Disambiguation hooks
-    const char *input;       ///< Current input
-    size_t input_pos;        ///< Current input position
-    size_t input_length;     ///< Total input length
-    glr_reader_t *reader;    ///< Token reader used for UTF-16 inputs
-    glr_lexer_hooks_t *lexer_hooks; ///< Optional pluggable lexer hooks
-    glr_reader_token_t lookahead;   ///< Last token produced by the reader
-    glr_parse_error_t error; ///< Last error
-    void *user_data;         ///< User data
+    glr_grammar_t *grammar;              ///< Grammar specification
+    glr_stack_t **stacks;                ///< Array of active parse stacks (GSS)
+    size_t stack_count;                  ///< Number of currently active stacks
+    size_t stack_capacity;               ///< Allocated capacity for stacks array
+    glr_forest_t *forest;                ///< Shared Packed Parse Forest (SPPF)
+    void **state_table;                  ///< LR state transition table
+    size_t state_table_size;             ///< Number of states in table
+    glr_disambig_hook_t *disambig_hooks; ///< Chain of disambiguation hooks
+    const char *input;                   ///< Current input buffer
+    size_t input_pos;                    ///< Current byte position in input
+    size_t input_length;                 ///< Total input buffer length in bytes
+    glr_reader_t *reader;                ///< Token reader for UTF-16 input
+    glr_lexer_hooks_t *lexer_hooks;      ///< Custom lexer hooks (optional)
+    glr_reader_token_t lookahead;        ///< Current lookahead token
+    glr_parse_error_t error;             ///< Most recent error code
+    void *user_data;                     ///< User-provided context pointer
   };
+
+  /* ========================================================================
+   * Core Parser Lifecycle Functions
+   * ======================================================================== */
 
   /**
    * @brief Create a new GLR parser
    *
+   * Allocates and initializes a new parser instance for the given grammar.
+   * The parser maintains a reference to the grammar but does not take ownership.
+   *
    * @param grammar Grammar to parse with
-   * @return Pointer to new parser, or NULL on failure
+   * @return Newly allocated parser instance, or NULL on allocation failure
+   *
+   * @note The caller must eventually call glr_parser_destroy() to free resources.
+   * @see glr_parser_destroy
    */
   glr_parser_t *glr_parser_create (glr_grammar_t *grammar);
 
   /**
-   * @brief Destroy a parser and free all associated memory
+   * @brief Destroy a parser instance and free all associated resources
    *
-   * @param parser Pointer to parser to destroy
+   * Releases all memory held by the parser, including stacks, parse forest,
+   * state tables, and disambiguation hooks. The grammar itself is not freed.
+   *
+   * @param parser Parser instance to destroy (may be NULL)
+   *
+   * @note After calling this function, the parser pointer is invalid.
+   * @see glr_parser_create
    */
   void glr_parser_destroy (glr_parser_t *parser);
 
   /**
-   * @brief Reset the parser for a new parse
+   * @brief Reset parser state for a new parse operation
    *
-   * @param parser Pointer to parser
+   * Clears all stacks, resets the parse forest, and reinitializes internal state.
+   * This is called automatically by glr_parse() but can be invoked manually
+   * if you need to abort a parse and start fresh.
+   *
+   * @param parser Parser instance to reset
    * @return 0 on success, -1 on failure
+   *
+   * @note The grammar and configuration (lexer hooks, disambiguation hooks) are preserved.
    */
   int glr_parser_reset (glr_parser_t *parser);
 
+  /* ========================================================================
+   * Parsing Functions
+   * ======================================================================== */
+
   /**
-   * @brief Parse input using the GLR algorithm
+   * @brief Parse input buffer using the GLR algorithm (non-incremental)
    *
-   * Runs the full GLR parsing loop on the provided input buffer.
-   * The parser is reset before each invocation.
+   * Performs a complete, non-incremental parse of the input buffer from start
+   * to finish. The parser is automatically reset before parsing begins, so any
+   * previous parse state is discarded.
    *
-   * @param parser Pointer to an initialized parser
-   * @param input  Input buffer to parse
+   * This function implements Tomita's GLR algorithm:
+   * 1. Maintains multiple parse stacks (Graph-Structured Stack)
+   * 2. Performs shift and reduce operations on all active stacks
+   * 3. Handles shift/reduce and reduce/reduce conflicts by forking stacks
+   * 4. Merges results into a Shared Packed Parse Forest (SPPF)
+   * 5. Applies disambiguation hooks to resolve ambiguities
+   *
+   * @param parser Initialized parser instance
+   * @param input  Input buffer to parse (UTF-8 or UTF-16)
    * @param length Length of the input buffer in bytes
-   * @return A @ref glr_parse_result_t describing the outcome
+   * @return Parse result structure containing error code, forest, and position
+   *
+   * @note For incremental parsing, use glr_parser_parse_incremental() instead.
+   * @note The returned forest is owned by the parser and remains valid until
+   *       the next parse operation or glr_parser_destroy().
+   *
+   * @see glr_parser_parse_incremental
+   * @see glr_parse_result_t
    */
   glr_parse_result_t glr_parse (glr_parser_t *parser, const char *input,
                                 size_t length);
 
+  /* ========================================================================
+   * Lexer Configuration
+   * ======================================================================== */
+
   /**
-   * @brief Configure lexer hooks used when parsing UTF-16 input.
+   * @brief Set custom lexer hooks for tokenization
    *
-   * The parser does not take ownership of @p hooks.
+   * Configures custom lexer hooks that override default tokenization behavior.
+   * This is useful for languages with complex lexical rules or when integrating
+   * with external lexers.
    *
-   * @param parser Pointer to parser
-   * @param hooks Hook registry or NULL to disable custom tokenization
+   * @param parser Parser instance
+   * @param hooks Lexer hooks structure, or NULL to use default tokenization
    * @return 0 on success, -1 on failure
+   *
+   * @note The parser does not take ownership of the hooks structure.
+   * @note Hooks are applied to the internal reader for UTF-16 input processing.
+   *
+   * @see glr_parser_get_lexer_hooks
+   * @see glr_lexer_hooks_t
    */
   int glr_parser_set_lexer_hooks (glr_parser_t *parser, glr_lexer_hooks_t *hooks);
 
   /**
-   * @brief Get the lexer hooks configured on the parser.
+   * @brief Get currently configured lexer hooks
    *
-   * @param parser Pointer to parser
-   * @return Hook registry or NULL
+   * @param parser Parser instance
+   * @return Currently configured lexer hooks, or NULL if none set
+   *
+   * @see glr_parser_set_lexer_hooks
    */
   glr_lexer_hooks_t *glr_parser_get_lexer_hooks (const glr_parser_t *parser);
 
+  /* ========================================================================
+   * Parser State Inspection
+   * ======================================================================== */
+
   /**
-   * @brief Get the most recent token observed by the parser.
+   * @brief Get the most recent token read by the parser
    *
-   * @param parser Pointer to parser
-   * @return Last token or NULL when no token has been produced yet
+   * Returns the current lookahead token that was last consumed from the input.
+   * This is useful for error reporting and debugging.
+   *
+   * @param parser Parser instance
+   * @return Pointer to last token, or NULL if no token has been read yet
+   *
+   * @note The returned pointer is valid until the next parse operation.
    */
   const glr_reader_token_t *glr_parser_get_last_token (const glr_parser_t *parser);
 
   /**
-   * @brief Set user data for the parser
+   * @brief Associate user data with the parser
    *
-   * @param parser Pointer to parser
-   * @param data User data pointer
+   * Stores an arbitrary user pointer that can be retrieved later. This is
+   * useful for passing context to disambiguation hooks or callbacks.
+   *
+   * @param parser Parser instance
+   * @param data User-provided context pointer
+   *
+   * @see glr_parser_get_user_data
    */
   static inline void
   glr_parser_set_user_data (glr_parser_t *parser, void *data)
@@ -160,10 +248,12 @@ extern "C"
   }
 
   /**
-   * @brief Get user data from the parser
+   * @brief Retrieve user data associated with the parser
    *
-   * @param parser Pointer to parser
-   * @return User data pointer
+   * @param parser Parser instance
+   * @return User data pointer previously set via glr_parser_set_user_data()
+   *
+   * @see glr_parser_set_user_data
    */
   static inline void *
   glr_parser_get_user_data (glr_parser_t *parser)
@@ -172,10 +262,10 @@ extern "C"
   }
 
   /**
-   * @brief Get the current error
+   * @brief Get the most recent error code
    *
-   * @param parser Pointer to parser
-   * @return Error code
+   * @param parser Parser instance
+   * @return Last error code, or GLR_PARSE_ERROR_MEMORY if parser is NULL
    */
   static inline glr_parse_error_t
   glr_parser_get_error (glr_parser_t *parser)
@@ -184,10 +274,17 @@ extern "C"
   }
 
   /**
-   * @brief Get the parse forest
+   * @brief Get the current parse forest
    *
-   * @param parser Pointer to parser
-   * @return Parse forest, or NULL
+   * Returns the Shared Packed Parse Forest (SPPF) containing all valid
+   * parse trees for the input. The forest may contain multiple derivations
+   * if the grammar is ambiguous.
+   *
+   * @param parser Parser instance
+   * @return Parse forest, or NULL if no successful parse has occurred
+   *
+   * @note The forest is owned by the parser and remains valid until the
+   *       next parse operation or glr_parser_destroy().
    */
   static inline glr_forest_t *
   glr_parser_get_forest (glr_parser_t *parser)
@@ -196,10 +293,14 @@ extern "C"
   }
 
   /**
-   * @brief Get the number of active stacks
+   * @brief Get the number of currently active parse stacks
    *
-   * @param parser Pointer to parser
-   * @return Number of stacks
+   * Returns the number of parallel parse paths being explored. This number
+   * increases when the parser encounters ambiguities and decreases when
+   * paths are merged or pruned.
+   *
+   * @param parser Parser instance
+   * @return Number of active stacks, or 0 if parser is NULL
    */
   static inline size_t
   glr_parser_stack_count (glr_parser_t *parser)
@@ -207,89 +308,125 @@ extern "C"
     return parser != NULL ? parser->stack_count : 0;
   }
 
-#ifdef __cplusplus
-}
-#endif
+  /* ========================================================================
+   * Incremental Parsing Support (requires LMDB)
+   * ======================================================================== */
 
-const char *glr_version (void);
-const char *glr_name (void);
 #ifdef HAVE_LMDB
-/* Forward declarations for cache types */
-struct glr_cache_t;
-struct glr_cache_stats_t;
+  /* Forward declarations for cache types */
+  struct glr_cache_t;
+  struct glr_cache_stats_t;
 
-/**
- * @brief Set cache for incremental parsing
- * 
- * @param parser Parser instance
- * @param cache Cache handle (can be NULL to disable caching)
- */
-void glr_parser_set_cache(glr_parser_t* parser, struct glr_cache_t* cache);
+  /**
+   * @brief Set cache handle for incremental parsing
+   *
+   * Associates a cache instance with the parser to enable incremental parsing.
+   * The cache stores parse results for input regions, allowing fast re-parsing
+   * when only small portions of the input change.
+   *
+   * @param parser Parser instance
+   * @param cache Cache handle, or NULL to disable caching
+   *
+   * @see glr_parser_get_cache
+   * @see glr_parser_enable_incremental
+   */
+  void glr_parser_set_cache (glr_parser_t *parser, struct glr_cache_t *cache);
 
-/**
- * @brief Get current cache handle
- * 
- * @param parser Parser instance
- * @return Cache handle or NULL
- */
-struct glr_cache_t* glr_parser_get_cache(const glr_parser_t* parser);
+  /**
+   * @brief Get the current cache handle
+   *
+   * @param parser Parser instance
+   * @return Cache handle, or NULL if caching is not enabled
+   *
+   * @see glr_parser_set_cache
+   */
+  struct glr_cache_t *glr_parser_get_cache (const glr_parser_t *parser);
 
-/**
- * @brief Enable incremental parsing with automatic cache setup
- * 
- * @param parser Parser instance
- * @param cache_path Path to cache directory
- * @return 0 on success, -1 on error
- */
-int glr_parser_enable_incremental(glr_parser_t* parser, const char* cache_path);
+  /**
+   * @brief Enable incremental parsing with automatic cache setup
+   *
+   * Creates and configures a cache at the specified path, enabling incremental
+   * parsing for subsequent operations. The cache persists across parser instances.
+   *
+   * @param parser Parser instance
+   * @param cache_path Filesystem path to cache directory
+   * @return 0 on success, -1 on error
+   *
+   * @see glr_parser_disable_incremental
+   * @see glr_parser_parse_incremental
+   */
+  int glr_parser_enable_incremental (glr_parser_t *parser,
+                                      const char *cache_path);
 
-/**
- * @brief Disable incremental parsing and close cache
- * 
- * @param parser Parser instance
- */
-void glr_parser_disable_incremental(glr_parser_t* parser);
+  /**
+   * @brief Disable incremental parsing and close cache
+   *
+   * Closes the cache and disables incremental parsing. Subsequent parse
+   * operations will be non-incremental.
+   *
+   * @param parser Parser instance
+   *
+   * @see glr_parser_enable_incremental
+   */
+  void glr_parser_disable_incremental (glr_parser_t *parser);
 
-/**
- * @brief Get cache statistics
- * 
- * @param parser Parser instance
- * @param stats Output statistics structure
- * @return 0 on success, -1 on error
- */
-int glr_parser_get_cache_stats(glr_parser_t* parser, struct glr_cache_stats_t* stats);
+  /**
+   * @brief Get cache performance statistics
+   *
+   * Retrieves statistics about cache usage, including hit/miss rates and
+   * storage metrics.
+   *
+   * @param parser Parser instance
+   * @param stats Output structure to receive statistics
+   * @return 0 on success, -1 on error
+   *
+   * @see glr_parser_enable_incremental
+   */
+  int glr_parser_get_cache_stats (glr_parser_t *parser,
+                                   struct glr_cache_stats_t *stats);
 
 #endif /* HAVE_LMDB */
 
-/**
- * @brief Parse incrementally (reuse previous parse results)
- * 
- * This function performs incremental parsing by reusing parse results
- * from unchanged regions of the input. It's significantly faster than
- * full parsing for small edits.
- * 
- * @param parser Parser instance
- * @param old_forest Previous parse forest (can be NULL for full parse)
- * @param old_content Previous source content (can be NULL for full parse)
- * @param old_len Length of old content
- * @param new_content New source content
- * @param new_len Length of new content
- * @param edit_start Start offset of edit (0 if unknown, will auto-detect)
- * @param edit_end End offset of edit in old content (0 if unknown)
- * @param out_forest Output parse forest
- * @return 0 on success, -1 on error
- */
-int glr_parser_parse_incremental(glr_parser_t* parser,
-                                  const glr_forest_t* old_forest,
-                                  const char* old_content,
-                                  size_t old_len,
-                                  const char* new_content,
-                                  size_t new_len,
-                                  size_t edit_start,
-                                  size_t edit_end,
-                                  glr_forest_t** out_forest);
+  /**
+   * @brief Parse incrementally by reusing previous parse results
+   *
+   * Performs incremental parsing by comparing the new input with the old input
+   * and reusing parse results from unchanged regions. This is significantly
+   * faster than full parsing for small edits, making it ideal for IDE and LSP
+   * integration.
+   *
+   * The algorithm:
+   * 1. Computes a diff between old_content and new_content
+   * 2. Identifies unchanged regions and reuses their parse trees from old_forest
+   * 3. Re-parses only the changed regions and their affected context
+   * 4. Merges the results into a new parse forest
+   *
+   * @param parser Parser instance
+   * @param old_forest Previous parse forest (NULL for full parse)
+   * @param old_content Previous source content (NULL for full parse)
+   * @param old_len Length of old content in bytes
+   * @param new_content New source content to parse
+   * @param new_len Length of new content in bytes
+   * @param edit_start Start byte offset of edit (0 if unknown, will auto-detect)
+   * @param edit_end End byte offset of edit in old content (0 if unknown)
+   * @param out_forest Output parameter to receive new parse forest
+   * @return 0 on success, -1 on error
+   *
+   * @note If old_forest or old_content is NULL, performs a full parse.
+   * @note The caller is responsible for freeing the output forest.
+   *
+   * @see glr_parse
+   * @see glr_parser_enable_incremental
+   */
+  int glr_parser_parse_incremental (glr_parser_t *parser,
+                                     const glr_forest_t *old_forest,
+                                     const char *old_content, size_t old_len,
+                                     const char *new_content, size_t new_len,
+                                     size_t edit_start, size_t edit_end,
+                                     glr_forest_t **out_forest);
 
-const char *glr_version (void);
-const char *glr_name (void);
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* GLR_PARSER_H */
