@@ -17,8 +17,15 @@ option(ENABLE_DOXYGEN "Build documentation with Doxygen" ON)
 # Find Directories
 # -----------------------------------------------------------------------------
 
-set(CURRENT ${CMAKE_CURRENT_SOURCE_DIR})
-get_filename_component(CMAKE_PARENT_DIRECTORY ${CURRENT} DIRECTORY)
+set(DEFAULT_SHELL "bash")
+
+execute_process(
+	COMMAND ${DEFAULT_SHELL} "find-source-directory.sh"
+	OUTPUT_VARIABLE LibGLR_TOP_SRCDIR
+	OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+message(STATUS "Found top source directory: ${LibGLR_TOP_SRCDIR}")	
 
 # -----------------------------------------------------------------------------
 # Find Doxygen
@@ -32,7 +39,6 @@ endif()
 # Paths
 # -----------------------------------------------------------------------------
 
-set(LibGLR_TOP_SRCDIR ${CMAKE_PARENT_DIRECTORY})
 set(LibGLR_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/docs)
 set(LibGLR_LAYOUT_FILE ${CMAKE_CURRENT_SOURCE_DIR}/layout.xml)
 set(LibGLR_STRIP_FROM_INC_PATH ${CMAKE_CURRENT_SOURCE_DIR})

@@ -92,6 +92,7 @@ set(GLR_SOURCES
     src/glr/reduction.c
     src/glr/graph.c
     src/glr/parser.c
+    src/glr/parsetbl.c
     src/glr/disambiguate.c
     src/glr/lexer-hooks.c
     src/glr/reader.c
@@ -179,6 +180,7 @@ install(FILES
     include/glr/parser.h
     include/glr/disambiguate.h
     include/glr/lexer-hooks.h
+    include/glr/parsetbl.h
     include/glr/reader.h
     include/glr/rewrite.h
     DESTINATION include/glr

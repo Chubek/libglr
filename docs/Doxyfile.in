@@ -1,6 +1,6 @@
 PROJECT_NAME           = "LibGLR"
 PROJECT_NUMBER         = "@LibGLR_PROJECT_VERSION@"
-PROJECT_BRIEF          = "Infrastructure for writing GLR parsers"
+PROJECT_BRIEF          = "Rewrite-driven compiler infrastructure and toolchain."
 OUTPUT_DIRECTORY       = "@LibGLR_OUTPUT_DIRECTORY@"
 OUTPUT_LANGUAGE        = English
 FULL_PATH_NAMES        = YES
@@ -9,19 +9,12 @@ STRIP_FROM_INC_PATH    = "@LibGLR_STRIP_FROM_INC_PATH@"
 LAYOUT_FILE            = "@LibGLR_LAYOUT_FILE@"
 
 INPUT                  = "@LibGLR_TOP_SRCDIR@/include/glr" \
-                         "@LibGLR_TOP_SRCDIR@/src/glr"
 INPUT_ENCODING         = UTF-8
 FILE_PATTERNS          = *.h *.c *.md
 RECURSIVE              = YES
 EXCLUDE                = "@LibGLR_TOP_SRCDIR@/third_party" \
                          "@LibGLR_TOP_SRCDIR@/build" \
-			 "@LibGLR_TOP_SRCDIR@/build_comprehensive" \
-			 "@LibGLR_TOP_SRCDIR@/moosepaw" \
-			 "@LibGLR_TOP_SRCDIR@/bindings" \
-                         "@LibGLR_TOP_SRCDIR@/.git" \
-			 "@LibGLR_TOP_SRCDIR@/disambstd" \
-			 "@LibGLR_TOP_SRCDIR@/tests" \
-			 "@LibGLR_TOP_SRCDIR@/build_test"
+                         "@LibGLR_TOP_SRCDIR@/.git"
 EXCLUDE_SYMLINKS       = YES
 
 USE_MDFILE_AS_MAINPAGE = "@LibGLR_TOP_SRCDIR@/docs/frontpage.md"
@@ -31,27 +24,22 @@ AUTOLINK_SUPPORT       = YES
 BUILTIN_STL_SUPPORT    = NO
 OPTIMIZE_OUTPUT_FOR_C  = YES
 TYPEDEF_HIDES_STRUCT   = YES
-
 EXTRACT_ALL            = YES
 EXTRACT_PRIVATE        = NO
 EXTRACT_STATIC         = YES
 EXTRACT_LOCAL_CLASSES  = NO
 EXTRACT_LOCAL_METHODS  = YES
-
 HIDE_UNDOC_MEMBERS     = NO
 HIDE_UNDOC_CLASSES     = NO
 HIDE_FRIEND_COMPOUNDS  = YES
 HIDE_IN_BODY_DOCS      = NO
 INTERNAL_DOCS          = NO
 CASE_SENSE_NAMES       = YES
-
 INLINE_SOURCES         = NO
 SOURCE_BROWSER         = YES
-
 REFERENCED_BY_RELATION = YES
 REFERENCES_RELATION    = YES
 REFERENCES_LINK_SOURCE = YES
-
 SOURCE_TOOLTIPS        = YES
 USE_HTAGS              = NO
 VERBATIM_HEADERS       = YES
@@ -67,7 +55,7 @@ WARN_LOGFILE           = "@LibGLR_WARN_LOGFILE@"
 GENERATE_HTML          = YES
 HTML_OUTPUT            = html
 HTML_FILE_EXTENSION    = .html
-HTML_COLORSTYLE        = DARK
+HTML_COLORSTYLE        = AUTO_LIGHT
 HTML_DYNAMIC_MENUS     = YES
 HTML_DYNAMIC_SECTIONS  = YES
 HTML_INDEX_NUM_ENTRIES = 100
@@ -90,8 +78,8 @@ MAKEINDEX_CMD_NAME     = makeindex
 
 GENERATE_MAN           = YES
 MAN_OUTPUT             = man
-MAN_EXTENSION          = .3glr
-MAN_SUBDIR             = man3glr
+MAN_EXTENSION          = .3wil
+MAN_SUBDIR             = man3wil
 MAN_LINKS              = YES
 
 GENERATE_XML           = YES
@@ -104,7 +92,7 @@ GENERATE_DOCBOOK       = YES
 DOCBOOK_OUTPUT         = docbook
 
 GENERATE_AUTOGEN_DEF   = YES
-GENERATE_PERLMOD       = YES
+GENERATE_PERLMOD       = NO
 GENERATE_SQLITE3       = NO
 
 HAVE_DOT               = @LibGLR_HAVE_DOT@
