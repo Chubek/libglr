@@ -22,7 +22,7 @@ TEST_CASE("Cache: Basic operations", "[cache][basic]") {
     mkdir(TEST_CACHE_DIR, 0755);
     
     glr_cache_config_t config = GLR_CACHE_DEFAULT_CONFIG;
-    config.lmdb_path = TEST_CACHE_DIR;
+    config.mdbx_path = TEST_CACHE_DIR;
     config.map_size = 10 * 1024 * 1024;
     
     glr_cache_t* cache = glr_cache_open(&config);

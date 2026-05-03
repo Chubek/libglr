@@ -429,14 +429,14 @@ glr_binding_rewrite_program_add_rule_kind (glr_rewrite_program_t *program,
 #ifdef HAVE_LMDB
 /* Cache helper functions */
 static glr_cache_config_t
-glr_binding_cache_config_create (const char *lmdb_path,
+glr_binding_cache_config_create (const char *mdbx_path,
                                  size_t map_size,
                                  uint32_t max_readers,
                                  bool use_async,
                                  uint64_t ttl_seconds)
 {
   glr_cache_config_t config;
-  config.lmdb_path = lmdb_path;
+  config.mdbx_path = mdbx_path;
   config.map_size = map_size;
   config.max_readers = max_readers;
   config.use_async = use_async;

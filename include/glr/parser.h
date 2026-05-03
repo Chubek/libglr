@@ -21,7 +21,7 @@
  * - Shared Packed Parse Forest (SPPF) for representing ambiguous parses
  * - Pluggable disambiguation strategies
  * - UTF-8 and UTF-16 input support via reader hooks
- * - Optional incremental parsing with caching (when compiled with LMDB support)
+ * - Optional incremental parsing with caching (when compiled with libmdbx support)
  *
  * The parser maintains multiple stacks simultaneously to handle grammar
  * ambiguities and conflicts, merging results into a shared parse forest.
@@ -336,7 +336,7 @@ extern "C"
   }
 
   /* ========================================================================
-   * Incremental Parsing Support (requires LMDB)
+   * Incremental Parsing Support (requires libmdbx)
    * ======================================================================== */
 
 #ifdef HAVE_LMDB

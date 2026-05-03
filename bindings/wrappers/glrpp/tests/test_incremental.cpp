@@ -25,7 +25,7 @@ int main() {
     std::filesystem::create_directories(cache_dir);
 
     glrpp::glr::cache_config config;
-    config.lmdb_path = cache_dir.string();
+    config.mdbx_path = cache_dir.string();
     parser.enable_incremental(config);
 
     const std::string original = "1 + 2";

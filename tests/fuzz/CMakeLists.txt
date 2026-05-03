@@ -35,11 +35,11 @@ function(add_fuzz_target target)
     
     target_link_libraries(${target} PRIVATE libglr)
     
-    if(ENABLE_CACHE)
-        if(TARGET LMDB::LMDB)
-            target_link_libraries(${target} PRIVATE LMDB::LMDB)
-        else()
-            target_link_libraries(${target} PRIVATE lmdb)
+if(ENABLE_CACHE)
+        if(TARGET mdbx-static)
+            target_link_libraries(${target} PRIVATE mdbx-static)
+        elseif(TARGET mdbx)
+            target_link_libraries(${target} PRIVATE mdbx)
         endif()
         
         if(OPENSSL_FOUND)

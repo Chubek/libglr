@@ -38,7 +38,7 @@
 #define GLRPP_HAS_LIBGLR 0
 #endif
 
-#if defined(HAVE_LMDB)
+#if defined(HAVE_LIBMDBX) || defined(HAVE_LMDB)
 #define GLRPP_HAS_LMDB_CACHE 1
 #elif defined(__has_include)
 #if __has_include(<glr/cache.h>)

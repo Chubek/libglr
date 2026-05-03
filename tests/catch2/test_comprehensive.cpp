@@ -218,7 +218,7 @@ TEST_CASE("Cache: Open and close", "[cache][incremental]") {
     system("mkdir -p /tmp/glr_test_comprehensive_1");
     
     glr_cache_config_t config = {0};
-    config.lmdb_path = "/tmp/glr_test_comprehensive_1";
+    config.mdbx_path = "/tmp/glr_test_comprehensive_1";
     config.map_size = 100 * 1024 * 1024;
     config.max_readers = 10;
     
@@ -248,7 +248,7 @@ TEST_CASE("Cache: Get statistics", "[cache][incremental]") {
     system("mkdir -p /tmp/glr_test_comprehensive_2");
     
     glr_cache_config_t config = {0};
-    config.lmdb_path = "/tmp/glr_test_comprehensive_2";
+    config.mdbx_path = "/tmp/glr_test_comprehensive_2";
     config.map_size = 100 * 1024 * 1024;
     config.max_readers = 10;
     
@@ -333,7 +333,7 @@ TEST_CASE("Dependency: Add", "[dependency][incremental]") {
     system("mkdir -p /tmp/glr_test_comprehensive_3");
     
     glr_cache_config_t config = {0};
-    config.lmdb_path = "/tmp/glr_test_comprehensive_3";
+    config.mdbx_path = "/tmp/glr_test_comprehensive_3";
     config.map_size = 100 * 1024 * 1024;
     config.max_readers = 10;
     
@@ -351,7 +351,7 @@ TEST_CASE("Dependency: Invalidate", "[dependency][incremental]") {
     system("mkdir -p /tmp/glr_test_comprehensive_4");
     
     glr_cache_config_t config = {0};
-    config.lmdb_path = "/tmp/glr_test_comprehensive_4";
+    config.mdbx_path = "/tmp/glr_test_comprehensive_4";
     config.map_size = 100 * 1024 * 1024;
     config.max_readers = 10;
     

@@ -3,9 +3,9 @@
 #include <glr/cache.h>
 #include <stdlib.h>
 #include <string.h>
-#include <lmdb.h>
+#include <mdbx.h>
 
-/* Internal dependency structure stored in LMDB */
+/* Internal dependency structure stored in libmdbx */
 typedef struct __attribute__((packed)) {
     uint32_t start_byte;
     uint32_t end_byte;
@@ -35,7 +35,7 @@ int glr_dependency_invalidate_range(glr_cache_t* cache,
     if (!cache) return -1;
     
     /* Scan all dependency records and invalidate overlapping entries */
-    /* This is a simplified stub - real implementation would use LMDB cursors */
+    /* This is a simplified stub - real implementation would use libmdbx cursors */
     
     return 0;
 }

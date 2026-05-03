@@ -13,7 +13,7 @@ extern "C" {
 
 /**
  * @file cache.h
- * @brief LMDB-based caching for incremental parsing in libglr
+ * @brief libmdbx-based caching for incremental parsing in libglr
  */
 
 /**
@@ -25,7 +25,7 @@ typedef struct glr_cache_t glr_cache_t;
  * Cache configuration
  */
 typedef struct {
-    const char* lmdb_path;      /**< Path to LMDB database directory */
+    const char* mdbx_path;      /**< Path to libmdbx database directory */
     size_t map_size;            /**< Maximum database size (default: 1GB) */
     uint32_t max_readers;       /**< Max concurrent readers (default: 126) */
     bool use_async;             /**< Async writes (default: false) */

@@ -194,7 +194,7 @@ int glr_parser_enable_incremental(glr_parser_t* parser, const char* cache_path) 
     if (!parser || !cache_path) return -1;
     
     glr_cache_config_t config = GLR_CACHE_DEFAULT_CONFIG;
-    config.lmdb_path = cache_path;
+    config.mdbx_path = cache_path;
     
     glr_cache_t* cache = glr_cache_open(&config);
     if (!cache) return -1;

@@ -19,7 +19,7 @@ namespace glrpp::glr {
 
 /** @brief Value-type configuration used when opening an incremental parse cache. */
 struct cache_config final {
-  std::string lmdb_path = ".";
+  std::string mdbx_path = ".";
   std::size_t map_size = 1024ull * 1024ull * 1024ull;
   std::uint32_t max_readers = 126;
   bool use_async = false;
@@ -27,7 +27,7 @@ struct cache_config final {
 
   [[nodiscard]] glr_cache_config_t native_config() const noexcept {
     glr_cache_config_t native{};
-    native.lmdb_path = lmdb_path.c_str();
+    native.mdbx_path = mdbx_path.c_str();
     native.map_size = map_size;
     native.max_readers = max_readers;
     native.use_async = use_async;

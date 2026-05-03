@@ -4,8 +4,10 @@ build_tests = get_option('build_tests')
 build_examples = get_option('build_examples')
 build_disambstd = get_option('build_disambstd')
 build_rewritelib = get_option('build_rewritelib')
+build_cache = get_option('build_cache')
 build_sharedlib = get_option('build_sharedlib')
 install_local = get_option('install_local')
+cache_dep = dependency('mdbx', required: false)
 
 if install_local
   home_dir = run_command('sh', '-c', 'printf %s "$HOME"', check: true).stdout().strip()
@@ -56,12 +58,29 @@ glr_sources = files(
   'src/glr/stack.c',
 )
 
+cache_compile_args = []
+cache_link_deps = []
+if build_cache and cache_dep.found()
+    cache_compile_args += ['-DHAVE_LMDB=1', '-DHAVE_LIBMDBX=1']
+    glr_sources += files(
+      'src/glr/cache.c',
+      'src/glr/parser-incr.c',
+      'src/glr/serialization.c',
+      'src/glr/diff.c',
+      'src/glr/dependency.c',
+      'src/glr/forest-merge.c',
+    )
+    cache_link_deps = [cache_dep]
+endif
+
 if build_sharedlib
   libglr = shared_library(
     'glr',
     glr_sources,
     include_directories: inc,
     link_with: sfsexp,
+    dependencies: cache_link_deps,
+    c_args: cache_compile_args,
     install: true,
     install_dir: lib_install_dir,
   )
@@ -71,9 +90,15 @@ else
     glr_sources,
     include_directories: inc,
     link_with: sfsexp,
+    dependencies: cache_link_deps,
+    c_args: cache_compile_args,
     install: true,
     install_dir: lib_install_dir,
   )
+endif
+
+if build_cache and not cache_dep.found()
+  warning('libmdbx not found. Incremental cache sources were not enabled in Meson build.')
 endif
 
 install_headers(

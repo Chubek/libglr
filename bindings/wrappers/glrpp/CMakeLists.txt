@@ -47,7 +47,7 @@ if(CMAKE_DL_LIBS)
     target_link_libraries(glrpp INTERFACE $<INSTALL_INTERFACE:${CMAKE_DL_LIBS}>)
 endif()
 
-if(HAVE_LMDB)
+if(HAVE_LMDB OR HAVE_LIBMDBX)
     target_compile_definitions(glrpp INTERFACE HAVE_LMDB=1)
 endif()
 

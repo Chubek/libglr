@@ -16,7 +16,10 @@ option(BUILD_SWIG_BINDINGS "Build SWIG bindings when SWIG is available" OFF)
 option(ENABLE_TEST_SANITIZERS "Enable address/undefined sanitizers for tests" OFF)
 option(BUILD_SHAREDLIB "Build libglr as a shared library" OFF)
 option(INSTALL_LOCAL "Install libglr into ~/.local instead of /usr/local" OFF)
-option(ENABLE_CACHE "Enable LMDB-based incremental parsing cache" ON)
+option(ENABLE_CACHE "Enable libmdbx-based incremental parsing cache" ON)
+
+set(HAVE_LMDB 0)
+set(HAVE_LIBMDBX 0)
 
 if(INSTALL_LOCAL)
     if(DEFINED ENV{HOME} AND NOT "$ENV{HOME}" STREQUAL "")
@@ -26,39 +29,36 @@ if(INSTALL_LOCAL)
     endif()
 endif()
 
-# Find LMDB if cache is enabled
 if(ENABLE_CACHE)
-    find_package(PkgConfig)
-    if(PkgConfig_FOUND)
-        pkg_check_modules(LMDB lmdb)
-    endif()
-    
-    if(NOT LMDB_FOUND)
-        find_path(LMDB_INCLUDE_DIR lmdb.h)
-        find_library(LMDB_LIBRARY NAMES lmdb)
-        
-        if(LMDB_INCLUDE_DIR AND LMDB_LIBRARY)
-            set(LMDB_FOUND TRUE)
-            set(LMDB_INCLUDE_DIRS ${LMDB_INCLUDE_DIR})
-            set(LMDB_LIBRARIES ${LMDB_LIBRARY})
-        endif()
-    endif()
-    
-    if(LMDB_FOUND)
-        message(STATUS "Found LMDB: ${LMDB_LIBRARIES}")
+    add_subdirectory(third_party/libmdbx EXCLUDE_FROM_ALL)
+
+    if(TARGET mdbx-static)
         set(HAVE_LMDB 1)
+        set(HAVE_LIBMDBX 1)
+        set(LIBMDBX_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/libmdbx)
+        set(LIBMDBX_LIBRARY mdbx-static)
+    elseif(TARGET mdbx)
+        set(HAVE_LMDB 1)
+        set(HAVE_LIBMDBX 1)
+        set(LIBMDBX_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/libmdbx)
+        set(LIBMDBX_LIBRARY mdbx)
     else()
-        message(WARNING "LMDB not found. Incremental parsing cache will be disabled.")
-        set(HAVE_LMDB 0)
+        message(WARNING "libmdbx target not available. Incremental parsing cache will be disabled.")
     endif()
-    
+
     # Find OpenSSL for SHA-256
-    find_package(OpenSSL REQUIRED)
-    if(OpenSSL_FOUND)
+    find_package(OpenSSL)
+    if(HAVE_LMDB AND OpenSSL_FOUND)
         message(STATUS "Found OpenSSL: ${OPENSSL_VERSION}")
     endif()
 else()
+    message(STATUS "Incremental cache disabled via ENABLE_CACHE=OFF")
+endif()
+
+if(ENABLE_CACHE AND HAVE_LMDB AND NOT OpenSSL_FOUND)
+    message(WARNING "OpenSSL not found. Incremental parsing cache will be disabled.")
     set(HAVE_LMDB 0)
+    set(HAVE_LIBMDBX 0)
 endif()
 
 # Bundle the local S-expression parser used by the rewrite subsystem.
@@ -103,11 +103,11 @@ set(GLR_SOURCES
 if(HAVE_LMDB)
     list(APPEND GLR_SOURCES
         src/glr/cache.c
-        src/glr/parser_inc.c
+        src/glr/parser-incr.c
         src/glr/serialization.c
         src/glr/diff.c
         src/glr/dependency.c
-        src/glr/forest_merge.c
+        src/glr/forest-merge.c
     )
 endif()
 
@@ -138,11 +138,15 @@ target_include_directories(${PROJECT_NAME}
 )
 target_link_libraries(${PROJECT_NAME} PUBLIC sfsexp)
 
-# Link LMDB and OpenSSL if available
+# Link libmdbx and OpenSSL if available
 if(HAVE_LMDB)
-    target_include_directories(${PROJECT_NAME} PRIVATE ${LMDB_INCLUDE_DIRS})
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${LMDB_LIBRARIES} OpenSSL::Crypto)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE HAVE_LMDB=1)
+    target_include_directories(${PROJECT_NAME} PRIVATE ${LIBMDBX_INCLUDE_DIR})
+    if(OpenSSL_FOUND)
+        target_link_libraries(${PROJECT_NAME} PRIVATE OpenSSL::Crypto)
+    endif()
+    target_compile_definitions(${PROJECT_NAME} PRIVATE
+        HAVE_LMDB=1
+        HAVE_LIBMDBX=1)
 endif()
 
 # Set compile options

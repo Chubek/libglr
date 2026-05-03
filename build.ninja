@@ -1,6 +1,6 @@
 cc = cc
 ar = ar
-cflags = -Iinclude -Ithird_party/sfsexp/src -std=c11 -Wall -Wextra -Wpedantic
+cflags = -Iinclude -Ithird_party/sfsexp/src -Ithird_party/libmdbx -std=c11 -Wall -Wextra -Wpedantic
 
 rule cc
   command = $cc $cflags -c $in -o $out
@@ -23,6 +23,12 @@ build out/graph.o: cc src/glr/graph.c
 build out/parser.o: cc src/glr/parser.c
 build out/disambiguate.o: cc src/glr/disambiguate.c
 build out/rewrite.o: cc src/glr/rewrite.c
+build out/cache.o: cc src/glr/cache.c
+build out/parser-incr.o: cc src/glr/parser-incr.c
+build out/serialization.o: cc src/glr/serialization.c
+build out/diff.o: cc src/glr/diff.c
+build out/dependency.o: cc src/glr/dependency.c
+build out/forest-merge.o: cc src/glr/forest-merge.c
 build out/cstring.o: cc third_party/sfsexp/src/cstring.c
 build out/event_temp.o: cc third_party/sfsexp/src/event_temp.c
 build out/faststack.o: cc third_party/sfsexp/src/faststack.c
@@ -34,7 +40,7 @@ build out/sexp_ops.o: cc third_party/sfsexp/src/sexp_ops.c
 build out/sexp_vis.o: cc third_party/sfsexp/src/sexp_vis.c
 
 build out/libsfsexp.a: ar out/cstring.o out/event_temp.o out/faststack.o out/io.o out/sfparser.o out/sexp.o out/sexp_memory.o out/sexp_ops.o out/sexp_vis.o
-build out/libglr.a: ar out/grammar.o out/stack.o out/fork.o out/forest.o out/reduction.o out/graph.o out/parser.o out/disambiguate.o out/rewrite.o
+build out/libglr.a: ar out/grammar.o out/stack.o out/fork.o out/forest.o out/reduction.o out/graph.o out/parser.o out/disambiguate.o out/rewrite.o out/cache.o out/parser-incr.o out/serialization.o out/diff.o out/dependency.o out/forest-merge.o
 build out/test_rewrite.o: cc tests/test_rewrite.c
 build out/test_rewrite: link out/test_rewrite.o out/libglr.a out/libsfsexp.a
 

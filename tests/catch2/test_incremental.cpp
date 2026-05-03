@@ -26,7 +26,7 @@ TEST_CASE("Incremental: API availability", "[incremental][api]") {
     REQUIRE(parser != nullptr);
     
     glr_cache_config_t config = GLR_CACHE_DEFAULT_CONFIG;
-    config.lmdb_path = "/tmp/libglr_test_inc";
+    config.mdbx_path = "/tmp/libglr_test_inc";
     config.map_size = 10 * 1024 * 1024;
     
     glr_cache_t* cache = glr_cache_open(&config);
