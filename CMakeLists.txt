@@ -17,9 +17,12 @@ option(ENABLE_TEST_SANITIZERS "Enable address/undefined sanitizers for tests" OF
 option(BUILD_SHAREDLIB "Build libglr as a shared library" OFF)
 option(INSTALL_LOCAL "Install libglr into ~/.local instead of /usr/local" OFF)
 option(ENABLE_CACHE "Enable libmdbx-based incremental parsing cache" ON)
+option(INSTALL_GLRpp "Enable installation of GLRpp" ON)
 
 set(HAVE_LMDB 0)
 set(HAVE_LIBMDBX 0)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 if(INSTALL_LOCAL)
     if(DEFINED ENV{HOME} AND NOT "$ENV{HOME}" STREQUAL "")
@@ -208,6 +211,10 @@ if(BUILD_DOCUMENTATION)
     add_subdirectory(docs)
 endif()
 
+if(INSTALL_GLRpp)
+   add_subdirectory(GLRpp)
+endif()
+
 if(EMBED_MD_DOCS)
     install(DIRECTORY docs/
         DESTINATION share/doc/${PROJECT_NAME}/markdown
@@ -256,8 +263,3 @@ write_basic_package_version_file(
     COMPATIBILITY SameMajorVersion
 )
 
-configure_package_config_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}-config.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake"
-    INSTALL_DESTINATION lib/cmake/${PROJECT_NAME}
-)

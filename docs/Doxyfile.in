@@ -4,20 +4,27 @@ PROJECT_BRIEF          = "Rewrite-driven compiler infrastructure and toolchain."
 OUTPUT_DIRECTORY       = "@LibGLR_OUTPUT_DIRECTORY@"
 OUTPUT_LANGUAGE        = English
 FULL_PATH_NAMES        = YES
-STRIP_FROM_PATH        = "@LibGLR_TOP_SRCDIR@"
-STRIP_FROM_INC_PATH    = "@LibGLR_TOP_SRCDIR@/include"
-LAYOUT_FILE            = "@LibGLR_TOP_SRCDIR@/layout.xml"
+STRIP_FROM_PATH        = @LibGLR_TOP_SRCDIR@
+STRIP_FROM_INC_PATH    = @LibGLR_TOP_SRCDIR@/include
+LAYOUT_FILE            = @LibGLR_TOP_SRCDIR@/layout.xml
 
-INPUT                  = "@LibGLR_TOP_SRCDIR@/include/glr" \
+INPUT                  = @LibGLR_TOP_SRCDIR@/include/glr \
+			 @LibGLR_TOP_SRCDIR@/src/glr	   \
+			 @LibGLR_TOP_SRCDIR@/disambstd
 INPUT_ENCODING         = UTF-8
-FILE_PATTERNS          = *.h *.c *.md
+FILE_PATTERNS          = *.h *.c *.md *.hpp *.cc
 RECURSIVE              = YES
 EXCLUDE                = "@LibGLR_TOP_SRCDIR@/third_party" \
                          "@LibGLR_TOP_SRCDIR@/build" \
                          "@LibGLR_TOP_SRCDIR@/.git"
 EXCLUDE_SYMLINKS       = YES
+EXTENSION_MAPPING      = md=markdown
 
-USE_MDFILE_AS_MAINPAGE = "@LibGLR_TOP_SRCDIR@/docs/frontpage.md"
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION	       = YES
+EXPAND_ONLY_PREDEF     = YES
+
+USE_MDFILE_AS_MAINPAGE = @LibGLR_TOP_SRCDIR@/docs/frontpage.md
 MARKDOWN_SUPPORT       = YES
 TOC_INCLUDE_HEADINGS   = 3
 AUTOLINK_SUPPORT       = YES
