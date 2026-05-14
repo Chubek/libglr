@@ -247,3 +247,5 @@ latex
 _binding_*
 
 _symbols
+
+*.sarif

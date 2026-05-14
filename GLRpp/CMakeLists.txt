@@ -16,7 +16,13 @@ if(PKG_CONFIG_FOUND)
 endif()
 
 # Install
-install(FILES GLRpp.hpp Polyfills.hpp dslutils.hpp
+install(FILES GLRpp.hpp Polyfills.hpp DSLUtils.hpp
+              rewrite/GrammarIR.hpp
+              rewrite/RewritePass.hpp
+              rewrite/RewritePipeline.hpp
+              rewrite/native/NativePasses.hpp
+              rewrite/equinox/EquinoxPasses.hpp
+              rewrite/syntax/SyntaxDSL.hpp
         DESTINATION include/GLRpp)
 
 # pkg-config file
@@ -28,7 +34,7 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/glrpp.pc
 find_package(Doxygen)
 if(DOXYGEN_FOUND)
     configure_file(Doxyfile.in Doxyfile @ONLY)
-    add_custom_target(docs
+    add_custom_target(glrpp-docs
         COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         COMMENT "Generating API documentation with Doxygen"

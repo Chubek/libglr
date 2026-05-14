@@ -15,7 +15,13 @@ glrpp_dep = declare_dependency(
 install_headers(
   'GLRpp.hpp',
   'Polyfills.hpp',
-  'dslutils.hpp',
+  'DSLUtils.hpp',
+  'rewrite/GrammarIR.hpp',
+  'rewrite/RewritePass.hpp',
+  'rewrite/RewritePipeline.hpp',
+  'rewrite/native/NativePasses.hpp',
+  'rewrite/equinox/EquinoxPasses.hpp',
+  'rewrite/syntax/SyntaxDSL.hpp',
   subdir: 'GLRpp'
 )
 

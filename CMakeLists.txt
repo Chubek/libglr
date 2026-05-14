@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 project(libglr VERSION 1.0.0 LANGUAGES C)
+include(GNUInstallDirs)
 
 # Set C standard
 set(CMAKE_C_STANDARD 11)
@@ -257,9 +258,17 @@ endif()
 # Generate package config file
 include(CMakePackageConfigHelpers)
 
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/libglr.pc.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/libglr.pc"
+    @ONLY
+)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/libglr.pc"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig"
+)
+
 write_basic_package_version_file(
     "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake"
     VERSION ${PROJECT_VERSION}
     COMPATIBILITY SameMajorVersion
 )
-

@@ -6,7 +6,13 @@ ACLOCAL_AMFLAGS = -I m4
 nobase_include_HEADERS = \
 	GLRpp/GLRpp.hpp \
 	GLRpp/Polyfills.hpp \
-	GLRpp/dslutils.hpp
+	GLRpp/DSLUtils.hpp \
+	GLRpp/rewrite/GrammarIR.hpp \
+	GLRpp/rewrite/RewritePass.hpp \
+	GLRpp/rewrite/RewritePipeline.hpp \
+	GLRpp/rewrite/native/NativePasses.hpp \
+	GLRpp/rewrite/equinox/EquinoxPasses.hpp \
+	GLRpp/rewrite/syntax/SyntaxDSL.hpp
 
 # pkg-config file
 pkgconfigdir = $(libdir)/pkgconfig

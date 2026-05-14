@@ -2,6 +2,9 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "../../../GLRpp/GLRpp.hpp"
+#include "../../../GLRpp/rewrite/equinox/EquinoxPasses.hpp"
+#include "../../../GLRpp/rewrite/native/NativePasses.hpp"
+#include "../../../GLRpp/rewrite/syntax/SyntaxDSL.hpp"
 
 #include <string>
 #include <vector>
@@ -96,4 +99,88 @@ TEST_CASE("grammar start symbol set") {
   glrpp::Grammar g;
   auto s = g.nonterminal("S");
   REQUIRE_NOTHROW(g.set_start(s));
+}
+
+TEST_CASE("grammar ir roundtrip") {
+  glrpp::Grammar g;
+  auto s = g.nonterminal("S");
+  auto a = g.terminal("a");
+  g.add_production(s, {a});
+  g.set_start(s);
+
+  auto ir = g.to_ir();
+  REQUIRE(ir.validate());
+  auto g2 = glrpp::Grammar::from_ir(ir);
+  auto ir2 = g2.to_ir();
+  REQUIRE(ir2.validate());
+  REQUIRE(ir2.productions.size() == 1);
+  REQUIRE(ir2.start_symbol_id.has_value());
+}
+
+TEST_CASE("native rewrite pipeline is opt-in") {
+  glrpp::Grammar g;
+  auto s = g.nonterminal("S");
+  auto a = g.terminal("a");
+  g.add_production(s, {a});
+  g.add_production(s, {a});
+  g.set_start(s);
+
+  REQUIRE(g.to_ir().productions.size() == 2);
+
+  glrpp::rewrite::RewritePipeline pipeline;
+  pipeline.add_once(glrpp::rewrite::native::remove_duplicate_productions());
+  auto rewritten = g.rewritten(pipeline);
+  REQUIRE(rewritten.to_ir().productions.size() == 1);
+}
+
+TEST_CASE("syntax rewrite compiles to executable pass") {
+  auto parsed = glrpp::rewrite::syntax::parse_rule("dedup: dedup_productions");
+  REQUIRE(parsed.is_ok());
+  auto compiled = glrpp::rewrite::syntax::compile_rule(parsed.unwrap());
+  REQUIRE(compiled.is_ok());
+
+  glrpp::Grammar g;
+  auto s = g.nonterminal("S");
+  auto a = g.terminal("a");
+  g.add_production(s, {a});
+  g.add_production(s, {a});
+  g.set_start(s);
+
+  glrpp::rewrite::RewritePipeline pipeline;
+  pipeline.add_once(compiled.unwrap());
+  auto rewritten = g.rewritten(pipeline);
+  REQUIRE(rewritten.to_ir().productions.size() == 1);
+}
+
+TEST_CASE("syntax rewrite supports sort operation") {
+  auto parsed = glrpp::rewrite::syntax::parse_rule("sorter: sort_productions");
+  REQUIRE(parsed.is_ok());
+  auto compiled = glrpp::rewrite::syntax::compile_rule(parsed.unwrap());
+  REQUIRE(compiled.is_ok());
+
+  glrpp::rewrite::GrammarIR ir;
+  const int s = ir.add_symbol("S", false);
+  const int a = ir.add_symbol("a", true);
+  const int p0 = ir.add_production(s, {a});
+  const int p1 = ir.add_production(s, {a});
+  ir.productions[0].id = p1;
+  ir.productions[1].id = p0;
+
+  REQUIRE(compiled.unwrap()->apply(ir));
+  REQUIRE(ir.productions[0].id == p0);
+  REQUIRE(ir.productions[1].id == p1);
+}
+
+TEST_CASE("equinox-backed pass integrates in pipeline") {
+  glrpp::Grammar g;
+  auto s = g.nonterminal("S");
+  auto a = g.terminal("a");
+  g.add_production(s, {a});
+  g.add_production(s, {a});
+  g.set_start(s);
+
+  glrpp::rewrite::RewritePipeline pipeline;
+  pipeline.add_fixed_point(glrpp::rewrite::equinox::equivalent_rhs_dedup(), 4);
+  auto rewritten = g.rewritten(pipeline);
+  REQUIRE(rewritten.to_ir().productions.size() == 1);
 }
