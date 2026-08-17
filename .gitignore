@@ -211,24 +211,6 @@ lcov.info
 ############################
 .gitignore.local
 
-###########################
-# Third Party Libraries
-###########################
-third_party/*
-!third_party/.gitkeep
-
-# Markdown files
-!README.md
-!GUIDE.md
-!INSTALL.md
-!BINDINGS.md
-!WRAPPERS.md
-!MOOSEPAW.md
-!DEPENDENCIES.md
-!docs/*.md
-
-*.md
-
 # Bindings
 _bindings_
 
@@ -249,3 +231,7 @@ _binding_*
 _symbols
 
 *.sarif
+
+# Agentic AI
+AGENTS.md
+.agents/
