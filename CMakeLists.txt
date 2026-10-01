@@ -5,6 +5,7 @@ include(GNUInstallDirs)
 # Set C standard
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
+find_package(Threads REQUIRED)
 
 # Options
 option(BUILD_TESTS "Build test suite" ON)
@@ -78,18 +79,18 @@ add_library(sfsexp STATIC ${SFSEXP_SOURCES})
 target_include_directories(sfsexp
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/sfsexp/src>
-        $<INSTALL_INTERFACE:include/libglr/third_party/sfsexp>)
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/libglr/third_party/sfsexp>)
 target_compile_options(sfsexp PRIVATE -w)
 set_target_properties(sfsexp PROPERTIES
     POSITION_INDEPENDENT_CODE ON
 )
 install(TARGETS sfsexp
     EXPORT ${PROJECT_NAME}-exports
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 install(DIRECTORY third_party/sfsexp/src/
-    DESTINATION include/libglr/third_party/sfsexp
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/libglr/third_party/sfsexp
     FILES_MATCHING PATTERN "*.h")
 
 # Library sources
@@ -120,7 +121,17 @@ set(GLR_SOURCES
     src/glr/live-parsing.c
     src/glr/querylisp.c
     src/glr/queryexec.c
+    src/glr/scannerless.c
+    src/glr/select.c
+    src/glr/semantic-action.c
+    src/glr/stringpool.c
+    src/glr/thread.c
+    third_party/klib/kalloc.c
+    third_party/klib/kthread.c
 )
+
+set_source_files_properties(third_party/klib/kalloc.c third_party/klib/kthread.c
+    PROPERTIES COMPILE_OPTIONS "-w")
 
 # Add cache sources if LMDB is available
 if(HAVE_LMDB)
@@ -137,12 +148,13 @@ endif()
 add_library(${PROJECT_NAME} ${GLR_LIBRARY_KIND} ${GLR_SOURCES})
 set_target_properties(${PROJECT_NAME} PROPERTIES
     POSITION_INDEPENDENT_CODE ON
+    OUTPUT_NAME glr
 )
 
 # Configure header with HAVE_LMDB
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/config.h.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/cmake/config.h"
+    "${CMAKE_CURRENT_BINARY_DIR}/include/glr/config.h"
 )
 
 # Set include directories
@@ -150,21 +162,51 @@ target_include_directories(${PROJECT_NAME}
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
-        $<INSTALL_INTERFACE:include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party
 )
-target_link_libraries(${PROJECT_NAME} PUBLIC sfsexp)
+target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ctl
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ctl/ctl)
+target_link_libraries(${PROJECT_NAME} PUBLIC sfsexp Threads::Threads)
+
+if(ENABLE_TEST_SANITIZERS)
+    target_compile_options(${PROJECT_NAME} PRIVATE
+        -fsanitize=address,undefined -fno-omit-frame-pointer)
+    target_link_options(${PROJECT_NAME} PUBLIC -fsanitize=address,undefined)
+endif()
 
 # Link libmdbx and OpenSSL if available
 if(HAVE_LMDB)
     target_include_directories(${PROJECT_NAME} PRIVATE ${LIBMDBX_INCLUDE_DIR})
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${LIBMDBX_LIBRARY})
     if(OpenSSL_FOUND)
         target_link_libraries(${PROJECT_NAME} PRIVATE OpenSSL::Crypto)
     endif()
     target_compile_definitions(${PROJECT_NAME} PRIVATE
         HAVE_LMDB=1
         HAVE_LIBMDBX=1)
+    # EXCLUDE_FROM_ALL also excludes the vendored installation rules. Export
+    # the cache dependency with relocatable paths for static-library clients.
+    set_property(TARGET ${LIBMDBX_LIBRARY} PROPERTY INTERFACE_INCLUDE_DIRECTORIES
+        $<BUILD_INTERFACE:${LIBMDBX_INCLUDE_DIR}>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/libglr/third_party/mdbx>)
+    get_target_property(GLR_MDBX_PUBLIC_HEADERS ${LIBMDBX_LIBRARY} PUBLIC_HEADER)
+    set(GLR_MDBX_INSTALL_HEADERS)
+    foreach(GLR_MDBX_HEADER IN LISTS GLR_MDBX_PUBLIC_HEADERS)
+        get_filename_component(GLR_MDBX_HEADER "${GLR_MDBX_HEADER}" ABSOLUTE
+            BASE_DIR "${LIBMDBX_INCLUDE_DIR}")
+        list(APPEND GLR_MDBX_INSTALL_HEADERS "${GLR_MDBX_HEADER}")
+    endforeach()
+    set_property(TARGET ${LIBMDBX_LIBRARY} PROPERTY PUBLIC_HEADER
+        "${GLR_MDBX_INSTALL_HEADERS}")
+    install(TARGETS ${LIBMDBX_LIBRARY}
+        EXPORT ${PROJECT_NAME}-exports
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/libglr/third_party/mdbx)
 endif()
 
 # Set compile options
@@ -182,9 +224,9 @@ add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 # Install targets
 install(TARGETS ${PROJECT_NAME}
     EXPORT ${PROJECT_NAME}-exports
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
 if(INSTALL_LOCAL)
@@ -211,7 +253,12 @@ install(FILES
     include/glr/serialization.h
     include/glr/live-parsing.h
     include/glr/query.h
-    DESTINATION include/glr
+    include/glr/scannerless.h
+    include/glr/select.h
+    include/glr/semantic-action.h
+    include/glr/stringpool.h
+    include/glr/thread.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/glr
 )
 
 # Install cache header and config if LMDB is available
@@ -219,7 +266,7 @@ if(HAVE_LMDB)
     install(FILES
         include/glr/cache.h
         ${CMAKE_CURRENT_BINARY_DIR}/include/glr/config.h
-        DESTINATION include/glr
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/glr
     )
 endif()
 
@@ -243,9 +290,9 @@ endif()
 
 # Export targets
 install(EXPORT ${PROJECT_NAME}-exports
-    FILE ${PROJECT_NAME}-config.cmake
+    FILE ${PROJECT_NAME}-targets.cmake
     NAMESPACE ${PROJECT_NAME}::
-    DESTINATION lib/cmake/${PROJECT_NAME}
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
 )
 
 if(BUILD_DISAMBSTD)
@@ -274,6 +321,22 @@ endif()
 # Generate package config file
 include(CMakePackageConfigHelpers)
 
+configure_package_config_file(cmake/libglr-config.cmake.in
+    "${CMAKE_CURRENT_BINARY_DIR}/libglr-config.cmake"
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/libglr)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/libglr-config.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/libglr)
+install(FILES third_party/klib/LICENSE.txt third_party/ctl/LICENSE
+    DESTINATION share/doc/libglr/licenses)
+
+set(GLR_PC_PRIVATE_LIBS "-lsfsexp -pthread")
+if(HAVE_LMDB)
+    get_target_property(GLR_MDBX_OUTPUT_NAME ${LIBMDBX_LIBRARY} OUTPUT_NAME)
+    string(APPEND GLR_PC_PRIVATE_LIBS " -l${GLR_MDBX_OUTPUT_NAME} -lcrypto")
+endif()
+file(RELATIVE_PATH GLR_PC_PREFIX_RELATIVE
+    "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/pkgconfig"
+    "${CMAKE_INSTALL_PREFIX}")
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/libglr.pc.in"
     "${CMAKE_CURRENT_BINARY_DIR}/libglr.pc"
@@ -288,3 +351,5 @@ write_basic_package_version_file(
     VERSION ${PROJECT_VERSION}
     COMPATIBILITY SameMajorVersion
 )
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})

@@ -8,6 +8,7 @@
 #include <glr/reader.h>
 #include <glr/reduction.h>
 #include <glr/stack.h>
+#include <glr/semantic-action.h>
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -47,7 +48,8 @@ extern "C"
     GLR_PARSE_ERROR_SYNTAX,       ///< Syntax error in input
     GLR_PARSE_ERROR_MEMORY,       ///< Memory allocation failure
     GLR_PARSE_ERROR_GRAMMAR,      ///< Invalid or malformed grammar
-    GLR_PARSE_ERROR_UNRECOVERABLE ///< Unrecoverable parse error (no valid paths)
+    GLR_PARSE_ERROR_UNRECOVERABLE, ///< Unrecoverable parse error (no valid paths)
+    GLR_PARSE_ERROR_SEMANTIC       ///< Deferred semantic evaluation failed
   } glr_parse_error_t;
 
   /**
@@ -63,13 +65,16 @@ extern "C"
     glr_forest_t *forest;    ///< Resulting parse forest (NULL on error)
     size_t position;         ///< Number of bytes consumed from input
     void *user_data;         ///< User-provided context data
+    void *semantic_value;    ///< Start-production value (see semantic-action.h)
+    glr_semantic_error_t semantic_error; ///< Semantic evaluation status
   } glr_parse_result_t;
 
   /**
    * @brief Sink for parse snapshots.
    *
-   * Invoked once per input position while a parse is running, with the parse
-   * stack that reaches that position. A snapshot is the whole configuration,
+   * Invoked for each distinct stack configuration that reaches a token
+   * boundary; ambiguous parses may invoke it multiple times at one position.
+   * A snapshot is the whole configuration,
    * not just the top of it: an LR reduction pops as many entries as its
    * production is long and reads the state below them, so resuming from a
    * single entry would silently lose the rest of the stack.
@@ -103,13 +108,12 @@ extern "C"
   struct glr_parser
   {
     glr_grammar_t *grammar;              ///< Grammar specification
-    glr_stack_t **stacks;                ///< Array of active parse stacks (GSS)
-    size_t stack_count;                  ///< Number of currently active stacks
+    glr_stack_t **stacks;                ///< Retained accepted parse stacks (GSS)
+    size_t stack_count;                  ///< Number of distinct accepted roots
     size_t stack_capacity;               ///< Allocated capacity for stacks array
     /**
-     * Parallel to @ref stacks. A set flag marks a stack that already holds
-     * the "shift without reducing" alternative of a shift/reduce conflict,
-     * so the reduce pass leaves it alone and the shift pass picks it up.
+     * Legacy compatibility storage parallel to @ref stacks. The immutable
+     * configuration scheduler does not use these flags.
      */
     bool *stack_skip_reduce;
     glr_forest_t *forest;                ///< Shared Packed Parse Forest (SPPF)
@@ -131,6 +135,10 @@ extern "C"
     char *trivia;                        ///< Literal skipped between tokens
     glr_parser_snapshot_fn snapshot_hook; ///< Optional per-position snapshot sink */
     void *snapshot_data;                  ///< Context passed to the snapshot sink */
+    bool scannerless;                     ///< Explore literal lexical alternatives
+    glr_semantic_resolver_fn semantic_resolver; ///< Resolve packed alternatives
+    bool generated_parse_table;           ///< Internal generated-table marker
+    uint64_t grammar_fingerprint;         ///< Structure used by the generated table
   };
 
   /* ========================================================================
@@ -211,6 +219,16 @@ extern "C"
   glr_parse_result_t glr_parse (glr_parser_t *parser, const char *input,
                                 size_t length);
 
+  /** Enable scannerless alternatives for literal-only grammars. Grammars with
+      terminal patterns enable it automatically. Patterns operate on byte input
+      (including UTF-8), bypassing UTF-16 auto-detection. */
+  int glr_parser_set_scannerless (glr_parser_t *parser, bool enabled);
+
+  /** Actions run automatically after acceptance when registered on a grammar.
+      A NULL resolver requires an unambiguous forest. */
+  int glr_parser_set_semantic_resolver (glr_parser_t *parser,
+                                       glr_semantic_resolver_fn resolver);
+
   /* ========================================================================
    * Resumable parsing
    * ======================================================================== */
@@ -224,16 +242,17 @@ extern "C"
    * possible.
    *
    * @param parser Parser instance (required).
-   * @return The forest, now owned by the caller; never NULL.
+    * @return The forest, now owned by the caller, or NULL on allocation failure.
    */
   glr_forest_t *glr_parser_take_forest (glr_parser_t *parser);
 
   /**
-   * @brief Install a sink that receives a snapshot at every position.
+    * @brief Install a sink that receives snapshots at token boundaries.
    *
-   * Snapshots are what make an edit cheap: the parse of a prefix does not
-   * depend on what follows it, so after an edit the parser can resume from
-   * the last snapshot the edit did not touch instead of starting over.
+    * A deterministic parse can resume from the last snapshot whose prefix and
+    * lexical boundary the edit did not touch. Ambiguous parses can produce
+    * several configurations at one offset; resuming every reading requires
+    * retaining all those configurations or reparsing the input.
    *
    * @param parser Parser instance (required).
    * @param snapshot Sink to invoke, or NULL to stop snapshotting.
@@ -269,7 +288,9 @@ extern "C"
    * @param out_result Receives the parse result; may be NULL.
    * @return 0 when the parse accepted, -1 on failure.
    *
-   * @note A snapshot is only valid for the text that preceded it. Resuming
+   * @note A snapshot is only valid for the text that preceded it and for its
+   *       lexical boundaries. An edit that can extend a pattern across the
+   *       boundary requires an earlier snapshot or a full parse. Resuming
    *       from a position the caller has since edited yields whatever the
    *       automaton makes of the new text, which is exactly the recomputation
    *       the caller wanted to avoid; the session layer in live-parsing.h
@@ -450,14 +471,13 @@ extern "C"
   }
 
   /**
-   * @brief Get the number of currently active parse stacks
+    * @brief Get the number of retained accepted parse stacks
    *
-   * Returns the number of parallel parse paths being explored. This number
-   * increases when the parser encounters ambiguities and decreases when
-   * paths are merged or pruned.
+    * Accepted stacks sharing the same packed root are retained once. Inspect
+    * glr_forest_is_ambiguous() to detect alternatives within an accepted root.
    *
    * @param parser Parser instance
-   * @return Number of active stacks, or 0 if parser is NULL
+    * @return Number of accepted roots, or 0 if parser is NULL
    */
   static inline size_t
   glr_parser_stack_count (glr_parser_t *parser)
@@ -569,7 +589,9 @@ extern "C"
    * @param out_forest Output parameter to receive new parse forest
    * @return 0 on success, -1 on error
    *
-   * @note If old_forest or old_content is NULL, performs a full parse.
+    * @note If old_forest or old_content is NULL, performs a full parse.
+    * @note Scannerless grammars and grammars with semantic actions perform a
+    *       full parse to preserve token boundaries and complete evaluations.
    * @note The caller is responsible for freeing the output forest.
    *
    * @see glr_parse

@@ -1,4 +1,4 @@
-prefix=@CMAKE_INSTALL_PREFIX@
+prefix=${pcfiledir}/@GLR_PC_PREFIX_RELATIVE@
 exec_prefix=${prefix}
 includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
 libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
@@ -9,4 +9,4 @@ Version: @PROJECT_VERSION@
 URL: @PROJECT_HOMEPAGE_URL@
 Cflags: -I${includedir}
 Libs: -L${libdir} -lglr
-Libs.private: -lsfsexp
+Libs.private: @GLR_PC_PRIVATE_LIBS@

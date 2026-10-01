@@ -45,6 +45,11 @@
 #include "reduction.h"
 #include "serialization.h"
 #include "stack.h"
+#include "scannerless.h"
+#include "select.h"
+#include "semantic-action.h"
+#include "stringpool.h"
+#include "thread.h"
 
 #ifdef __cplusplus
 extern "C"

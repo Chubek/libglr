@@ -366,12 +366,8 @@ GLR_TEST_CASE (test_extra_sppf_derivations)
   GLR_TEST_ASSERT_NOT_NULL (grammar, "grammar should be created");
   GLR_TEST_ASSERT_NOT_NULL (amb, "grammar should be created");
 
-  /* Expr -> Expr '+' Expr | Expr '*' Expr | n is a genuinely ambiguous
-     grammar: "n*n+n" has two readings. The generated LR(1) table has no
-     conflict (the two reductions live in different states), so the engine
-     commits to one of them deterministically and the forest keeps a single
-     derivation. The multi-derivation counting is verified directly on a
-     hand-packed forest below, where the ambiguity is explicit. */
+   /* Expr -> Expr '+' Expr | Expr '*' Expr | n is genuinely ambiguous:
+      "n*n+n" has two readings, both of which must survive GLR packing. */
   {
     int expr
         = glr_grammar_add_symbol (amb, GLR_SYMBOL_NONTERMINAL, "Expr");
@@ -422,11 +418,10 @@ GLR_TEST_CASE (test_extra_sppf_derivations)
   result = glr_parse (parser, "n*n+n", 5);
   GLR_TEST_ASSERT_EQ (result.error, GLR_PARSE_SUCCESS,
                       "ambiguous input should still parse");
-  /* The table has a conflict here, so the engine must keep more than one
-     live stack: that is the GLR part, and it is what lets a disambiguator
-     choose among readings instead of the parser committing blindly. */
-  GLR_TEST_ASSERT (glr_parser_stack_count (parser) > 1,
-                   "a conflicting grammar should keep parallel stacks");
+  /* Equivalent accepting configurations may merge; their packed derivations
+     must remain available to disambiguators and semantic evaluation. */
+  GLR_TEST_ASSERT (glr_forest_is_ambiguous (result.forest->root),
+                   "both readings must survive configuration merging");
   GLR_TEST_ASSERT_NOT_NULL (result.forest, "forest should exist");
   if (result.forest != NULL)
     {

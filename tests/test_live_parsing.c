@@ -17,7 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Expr -> Expr '+' Expr | Expr '-' Expr | Term, Term -> Factor,
+/* Expr -> Expr '+' Term | Expr '-' Term | Term, Term -> Factor,
    Factor -> n | '(' Expr ')'. The terminals are literal text so the parser's
    grammar-driven tokenizer matches them. */
 static glr_grammar_t *
@@ -54,7 +54,7 @@ live_grammar (void)
     glr_grammar_add_production (grammar, expr, body, 1);
     body[0] = glr_grammar_get_symbol (grammar, expr);
     body[1] = glr_grammar_get_symbol (grammar, plus);
-    body[2] = glr_grammar_get_symbol (grammar, expr);
+    body[2] = glr_grammar_get_symbol (grammar, term);
     glr_grammar_add_production (grammar, expr, body, 3);
     body[1] = glr_grammar_get_symbol (grammar, minus);
     glr_grammar_add_production (grammar, expr, body, 3);
@@ -368,6 +368,68 @@ GLR_TEST_CASE (test_live_edit_validation)
     glr_test_end ();
 }
 
+GLR_TEST_CASE (test_live_update_preserves_ambiguous_readings)
+{
+    glr_grammar_t *grammar = glr_grammar_create ();
+    int expr = glr_grammar_add_symbol (grammar, GLR_SYMBOL_NONTERMINAL, "Expr");
+    int n = glr_grammar_add_symbol (grammar, GLR_SYMBOL_TERMINAL, "n");
+    int plus = glr_grammar_add_symbol (grammar, GLR_SYMBOL_TERMINAL, "+");
+    int minus = glr_grammar_add_symbol (grammar, GLR_SYMBOL_TERMINAL, "-");
+    glr_symbol_t *body[] = { grammar->symbols[expr], grammar->symbols[plus],
+                             grammar->symbols[expr] };
+    glr_live_edit_t edit = { 1, 6, 1, 7, "-", 1 };
+    glr_live_parser_stats_t live_stats;
+    char error[128] = { 0 };
+
+    glr_test_begin ("live edits retain every packed reading of ambiguous expressions");
+    glr_grammar_add_production (grammar, expr, body, 3);
+    body[1] = grammar->symbols[minus];
+    glr_grammar_add_production (grammar, expr, body, 3);
+    body[0] = grammar->symbols[n];
+    glr_grammar_add_production (grammar, expr, body, 1);
+    glr_grammar_set_start_symbol (grammar, expr);
+
+    glr_live_parser_t *live = glr_live_parser_create (grammar, "n+n+n+n", 7,
+                                                     error, sizeof (error));
+    GLR_TEST_ASSERT_NOT_NULL (live, error);
+    if (live == NULL)
+    {
+        glr_grammar_destroy (grammar);
+        return;
+    }
+    GLR_TEST_ASSERT (glr_forest_is_ambiguous (glr_live_parser_forest (live)->root),
+                     "the initial expression has multiple associations");
+    GLR_TEST_ASSERT_EQ (glr_live_parser_edit (live, &edit, error, sizeof (error)),
+                        0, "the operator edit should be accepted");
+    GLR_TEST_ASSERT_EQ (glr_live_parser_update (live, error, sizeof (error)),
+                        0, "the updated expression should parse");
+
+    glr_parser_t *fresh = glr_parser_create (grammar);
+    glr_parse_result_t result = glr_parse (fresh, "n+n+n-n", 7);
+    const glr_forest_t *updated = glr_live_parser_forest (live);
+    GLR_TEST_ASSERT_EQ (result.error, GLR_PARSE_SUCCESS, "a fresh parse should accept the edit");
+    GLR_TEST_ASSERT_NOT_NULL (updated, "the updated forest should be available");
+    if (updated != NULL && result.forest != NULL)
+    {
+        GLR_TEST_ASSERT_EQ (updated->root->child_count, 3,
+                            "all three outer production splits should survive");
+        GLR_TEST_ASSERT_EQ (updated->root->child_count, result.forest->root->child_count,
+                            "live and fresh parses should preserve the same alternatives");
+        GLR_TEST_ASSERT_EQ (updated->root->end_position, 7,
+                            "the rebuilt root covers the complete edited input");
+    }
+    GLR_TEST_ASSERT_EQ (glr_live_parser_get_stats (live, &live_stats), 0,
+                        "update statistics should be available");
+    GLR_TEST_ASSERT_EQ (live_stats.bytes_reused, 0,
+                        "a single-stack snapshot must not discard ambiguous readings");
+    GLR_TEST_ASSERT_EQ (live_stats.bytes_reparsed, 7,
+                        "all edited input is reconsidered for an ambiguous forest");
+    glr_parser_destroy (fresh);
+    glr_live_parser_destroy (live);
+    glr_grammar_destroy (grammar);
+    glr_test_end ();
+}
+
 GLR_TEST_CASE (test_live_broken_edit_is_reported)
 {
     glr_grammar_t *grammar = live_grammar ();
@@ -643,6 +705,7 @@ main (void)
     test_live_create_rejects_bad_input (&stats);
     test_live_edit_marks_branches (&stats);
     test_live_update_reuses_the_prefix (&stats);
+    test_live_update_preserves_ambiguous_readings (&stats);
     test_live_edit_validation (&stats);
     test_live_broken_edit_is_reported (&stats);
     test_live_set_text (&stats);

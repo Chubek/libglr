@@ -1,30 +1,36 @@
 #include <glr/grammar.h>
+#include "containers.h"
+#include "grammar-internal.h"
+#include <klib/kvec.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-/* strdup() is not part of C11, so the library carries its own copy helper
-   to stay strictly conforming under -std=c11. */
-static char *
-glr_strdup (const char *text)
+void
+glr_grammar_symbol_destroy (glr_symbol_t *symbol)
 {
-  size_t length;
-  char *copy;
+  if (symbol == NULL)
+    return;
+  glr_terminal_pattern_destroy (symbol->pattern);
+  free (symbol);
+}
 
-  if (text == NULL)
+void
+glr_grammar_production_destroy (glr_production_t *production)
+{
+  if (production == NULL)
+    return;
+  if (production->semantic_action != NULL)
     {
-      return NULL;
+      if (production->semantic_action->destroy != NULL)
+        production->semantic_action->destroy (production->semantic_action->data);
+      free (production->semantic_action);
     }
-
-  length = strlen (text);
-  copy = malloc (length + 1);
-  if (copy == NULL)
-    {
-      return NULL;
-    }
-
-  memcpy (copy, text, length + 1);
-  return copy;
+  free (production->aliases);
+  free (production->body);
+  free (production->annotation);
+  free (production);
 }
 
 glr_grammar_t *
@@ -44,6 +50,12 @@ glr_grammar_create (void)
   grammar->name = NULL;
   grammar->parse_table = NULL;
   grammar->owns_parse_table = false;
+  grammar->strings = glr_stringpool_create ();
+  if (grammar->strings == NULL)
+    {
+      free (grammar);
+      return NULL;
+    }
 
   return grammar;
 }
@@ -62,8 +74,7 @@ glr_grammar_destroy (glr_grammar_t *grammar)
       glr_symbol_t *symbol = grammar->symbols[i];
       if (symbol != NULL)
         {
-          free (symbol->name);
-          free (symbol);
+          glr_grammar_symbol_destroy (symbol);
         }
     }
   free (grammar->symbols);
@@ -74,14 +85,13 @@ glr_grammar_destroy (glr_grammar_t *grammar)
       glr_production_t *production = grammar->productions[i];
       if (production != NULL)
         {
-          free (production->body);
-          free (production->annotation);
-          free (production);
+          glr_grammar_production_destroy (production);
         }
     }
   free (grammar->productions);
 
   free (grammar->name);
+  glr_stringpool_destroy (grammar->strings);
   if (grammar->owns_parse_table)
     {
       glr_parse_table_destroy (grammar->parse_table);
@@ -93,7 +103,9 @@ int
 glr_grammar_add_symbol (glr_grammar_t *grammar, glr_symbol_type_t type,
                         const char *name)
 {
-  if (grammar == NULL || name == NULL || name[0] == '\0')
+  if (grammar == NULL || name == NULL || name[0] == '\0'
+      || (type != GLR_SYMBOL_TERMINAL && type != GLR_SYMBOL_NONTERMINAL)
+      || grammar->symbol_count >= INT_MAX)
     {
       return -1;
     }
@@ -107,26 +119,29 @@ glr_grammar_add_symbol (glr_grammar_t *grammar, glr_symbol_type_t type,
 
   symbol->type = type;
   symbol->id = (int)grammar->symbol_count;
-  symbol->name = glr_strdup (name);
+  symbol->name = (char *) glr_stringpool_intern (grammar->strings, name);
   if (symbol->name == NULL)
     {
       free (symbol);
       return -1;
     }
 
-  /* Expand symbols array */
-  glr_symbol_t **new_symbols = realloc (
-      grammar->symbols, (grammar->symbol_count + 1) * sizeof (glr_symbol_t *));
+  kvec_t (glr_symbol_t *) symbols = {
+    grammar->symbol_count, grammar->symbol_capacity, grammar->symbols
+  };
+  glr_symbol_t **new_symbols = glr_array_grow (
+      symbols.a, &symbols.m, symbols.n + 1, sizeof (*symbols.a));
   if (new_symbols == NULL)
     {
-      free (symbol->name);
       free (symbol);
       return -1;
     }
 
-  grammar->symbols = new_symbols;
-  grammar->symbols[grammar->symbol_count] = symbol;
-  grammar->symbol_count++;
+  symbols.a = new_symbols;
+  kv_push (glr_symbol_t *, symbols, symbol);
+  grammar->symbols = symbols.a;
+  grammar->symbol_count = symbols.n;
+  grammar->symbol_capacity = symbols.m;
 
   return (int)(grammar->symbol_count - 1);
 }
@@ -146,7 +161,9 @@ int
 glr_grammar_add_production (glr_grammar_t *grammar, int head_id,
                             glr_symbol_t **body, size_t body_length)
 {
-  if (grammar == NULL || head_id < 0)
+  if (grammar == NULL || head_id < 0 || grammar->production_count >= INT_MAX
+      || body_length > SIZE_MAX / sizeof (*body)
+      || (body_length != 0 && body == NULL))
     {
       return -1;
     }
@@ -180,7 +197,11 @@ glr_grammar_add_production (glr_grammar_t *grammar, int head_id,
 
   for (size_t i = 0; i < body_length; i++)
     {
-      if (body == NULL || body[i] == NULL)
+      size_t owned;
+      for (owned = 0; owned < grammar->symbol_count; owned++)
+        if (grammar->symbols[owned] == body[i])
+          break;
+      if (body[i] == NULL || owned == grammar->symbol_count)
         {
           free (production->body);
           free (production);
@@ -191,10 +212,11 @@ glr_grammar_add_production (glr_grammar_t *grammar, int head_id,
 
   production->annotation = NULL;
 
-  /* Expand productions array */
-  glr_production_t **new_productions
-      = realloc (grammar->productions, (grammar->production_count + 1)
-                                           * sizeof (glr_production_t *));
+  kvec_t (glr_production_t *) productions = {
+    grammar->production_count, grammar->production_capacity, grammar->productions
+  };
+  glr_production_t **new_productions = glr_array_grow (
+      productions.a, &productions.m, productions.n + 1, sizeof (*productions.a));
   if (new_productions == NULL)
     {
       free (production->body);
@@ -202,9 +224,11 @@ glr_grammar_add_production (glr_grammar_t *grammar, int head_id,
       return -1;
     }
 
-  grammar->productions = new_productions;
-  grammar->productions[grammar->production_count] = production;
-  grammar->production_count++;
+  productions.a = new_productions;
+  kv_push (glr_production_t *, productions, production);
+  grammar->productions = productions.a;
+  grammar->production_count = productions.n;
+  grammar->production_capacity = productions.m;
 
   return (int)(grammar->production_count - 1);
 }
@@ -336,7 +360,10 @@ glr_grammar_validate (const glr_grammar_t *grammar, char *error,
       return false;
     }
 
-  if (grammar->start_symbol == NULL)
+  if (grammar->start_symbol == NULL
+      || !glr_symbol_is_nonterminal (grammar->start_symbol)
+      || glr_grammar_get_symbol (grammar, grammar->start_symbol->id)
+             != grammar->start_symbol)
     {
       glr_grammar_validation_error (error, error_size, "no start symbol");
       return false;
@@ -352,7 +379,10 @@ glr_grammar_validate (const glr_grammar_t *grammar, char *error,
           return false;
         }
       if (production->head == NULL
-          || !glr_symbol_is_nonterminal (production->head))
+          || !glr_symbol_is_nonterminal (production->head)
+          || glr_grammar_get_symbol (grammar, production->head->id)
+                 != production->head
+          || (production->body_length > 0 && production->body == NULL))
         {
           glr_grammar_validation_error (error, error_size,
                                         "production head must be a "

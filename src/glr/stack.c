@@ -1,7 +1,18 @@
 #include <glr/stack.h>
+#include "containers.h"
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
+typedef void *stack_slot_t;
+#define T stack_slot_t
+#define P
+#include <ctl/vec.h>
+typedef glr_stack_node_t *stack_parent_t;
+#define T stack_parent_t
+#define P
+#include <ctl/vec.h>
 
 struct glr_stack_node
 {
@@ -11,7 +22,7 @@ struct glr_stack_node
   size_t parent_count;
   size_t parent_capacity;
   glr_forest_node_t *forest_node;
-  size_t refcount; /* number of stacks referencing this entry */
+  atomic_size_t refcount; /* references held by independent stacks */
   void *state;
   size_t height;
   struct glr_stack_node *parent;
@@ -64,14 +75,7 @@ glr_stack_destroy (glr_stack_t *stack)
             {
               continue;
             }
-          if (entry->refcount > 1)
-            {
-              entry->refcount--;
-            }
-          else
-            {
-              glr_stack_node_destroy (entry);
-            }
+          glr_stack_node_release (entry);
         }
     }
 
@@ -114,7 +118,7 @@ glr_stack_fork (glr_stack_t *stack, size_t height)
           glr_stack_node_t *entry = (glr_stack_node_t *) fork->states[i];
           if (entry != NULL)
             {
-              entry->refcount++;
+              atomic_fetch_add_explicit (&entry->refcount, 1, memory_order_relaxed);
             }
         }
     }
@@ -125,30 +129,27 @@ glr_stack_fork (glr_stack_t *stack, size_t height)
 int
 glr_stack_push (glr_stack_t *stack, void *state)
 {
-  size_t new_capacity;
-  void **new_states;
+  vec_stack_slot_t view = vec_stack_slot_t_init ();
+  stack_slot_t *grown;
 
   if (stack == NULL)
     {
       return -1;
     }
 
-  if (stack->height >= stack->capacity)
-    {
-      /* Expand capacity if needed */
-      new_capacity = stack->capacity == 0 ? 16 : stack->capacity * 2;
-      new_states = realloc (stack->states, new_capacity * sizeof (void *));
-      if (new_states == NULL)
-        {
-          return -1;
-        }
-
-      stack->capacity = new_capacity;
-      stack->states = new_states;
-    }
-
-  stack->states[stack->height] = state;
-  stack->height++;
+  if (stack->height == SIZE_MAX)
+    return -1;
+  view.value = stack->states;
+  view.size = stack->height;
+  view.capacity = stack->capacity;
+  grown = GLR_VECTOR_RESERVE (&view, view.size + 1);
+  if (grown == NULL)
+    return -1;
+  view.value = grown;
+  vec_stack_slot_t_push_back (&view, state);
+  stack->states = view.value;
+  stack->height = view.size;
+  stack->capacity = view.capacity;
 
   return 0;
 }
@@ -205,6 +206,8 @@ glr_stack_reset (glr_stack_t *stack)
     }
   for (size_t i = 0; i < stack->height; i++)
     {
+      if (stack->owns_gss_entries)
+        glr_stack_node_release (stack->states[i]);
       stack->states[i] = NULL;
     }
   stack->height = 0;
@@ -225,7 +228,7 @@ glr_stack_node_create (uint32_t state_id, uint32_t position)
   node->parent_count = 0;
   node->parent_capacity = 0;
   node->forest_node = NULL;
-  node->refcount = 1;
+  atomic_init (&node->refcount, 1);
   node->state = NULL;
   node->height = 0;
   node->parent = NULL;
@@ -254,25 +257,26 @@ glr_stack_node_free (glr_stack_node_t *node)
 int
 glr_stack_node_add_parent (glr_stack_node_t *node, glr_stack_node_t *parent)
 {
-  glr_stack_node_t **grown;
-  size_t new_cap;
+  vec_stack_parent_t view = vec_stack_parent_t_init ();
+  stack_parent_t *grown;
 
   if (node == NULL || parent == NULL)
     {
       return -1;
     }
-  if (node->parent_count >= node->parent_capacity)
-    {
-      new_cap = node->parent_capacity == 0 ? 4 : node->parent_capacity * 2;
-      grown = realloc (node->parents, new_cap * sizeof (*grown));
-      if (grown == NULL)
-        {
-          return -1;
-        }
-      node->parents = grown;
-      node->parent_capacity = new_cap;
-    }
-  node->parents[node->parent_count++] = parent;
+  if (node->parent_count == SIZE_MAX)
+    return -1;
+  view.value = node->parents;
+  view.size = node->parent_count;
+  view.capacity = node->parent_capacity;
+  grown = GLR_VECTOR_RESERVE (&view, view.size + 1);
+  if (grown == NULL)
+    return -1;
+  view.value = grown;
+  vec_stack_parent_t_push_back (&view, parent);
+  node->parents = view.value;
+  node->parent_count = view.size;
+  node->parent_capacity = view.capacity;
   return 0;
 }
 
@@ -337,6 +341,8 @@ glr_stack_copy (const glr_stack_t *stack)
     {
       return NULL;
     }
+
+  copy->owns_gss_entries = stack->owns_gss_entries;
 
   for (size_t i = 0; i < stack->height; i++)
     {
@@ -412,12 +418,8 @@ glr_stack_node_release (glr_stack_node_t *node)
     {
       return;
     }
-  if (node->refcount > 1)
-    {
-      node->refcount--;
-      return;
-    }
-  glr_stack_node_destroy (node);
+  if (atomic_fetch_sub_explicit (&node->refcount, 1, memory_order_acq_rel) == 1)
+    glr_stack_node_destroy (node);
 }
 
 void

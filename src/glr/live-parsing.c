@@ -23,6 +23,7 @@
  */
 
 #include <glr/live-parsing.h>
+#include <glr/scannerless.h>
 
 #include <stdint.h>
 #include <stdio.h>
@@ -131,6 +132,8 @@ live_error_text (glr_parse_error_t error)
         return "grammar is not usable for parsing";
     case GLR_PARSE_ERROR_UNRECOVERABLE:
         return "no reading of the input survives";
+    case GLR_PARSE_ERROR_SEMANTIC:
+        return "semantic evaluation failed";
     default:
         break;
     }
@@ -957,8 +960,14 @@ glr_live_parser_update (glr_live_parser_t *live, char *error,
        record of where the previous parse got to, and the parse that follows
        re-emits its own. The chosen one is copied out first so the rest can go. */
     {
-        const struct live_snapshot *picked
-            = live_pick_resume (live, live->edit_start, &resume_position);
+        /* A pattern may grow across the edit boundary, and a single saved
+           stack cannot represent every lexical/packed alternative. Rebuild
+           those parses so edits preserve the complete language/forest. */
+        const struct live_snapshot *picked = NULL;
+        if (!glr_scannerless_has_patterns (live->grammar)
+            && !live->parser->scannerless
+            && (live->forest == NULL || !glr_forest_is_ambiguous (live->forest->root)))
+            picked = live_pick_resume (live, live->edit_start, &resume_position);
         if (picked != NULL)
         {
             resume = glr_stack_copy (picked->stack);

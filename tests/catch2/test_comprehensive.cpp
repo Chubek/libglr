@@ -64,7 +64,7 @@ TEST_CASE("Grammar: Add production", "[grammar][core]") {
     int t = glr_grammar_add_symbol(grammar, GLR_SYMBOL_TERMINAL, "n");
     
     glr_symbol_t* syms[1];
-    syms[0] = (glr_symbol_t*)(intptr_t)t;
+    syms[0] = glr_grammar_get_symbol(grammar, t);
     
     int prod = glr_grammar_add_production(grammar, nt, syms, 1);
     REQUIRE(prod >= 0);

@@ -4,6 +4,7 @@
 #include <glr/dependency.h>
 #include <glr/diff.h>
 #include <glr/forest-merge.h>
+#include <glr/scannerless.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -34,8 +35,12 @@ int glr_parser_parse_incremental(glr_parser_t* parser,
 
     *out_forest = NULL;
 
-    /* If no old content or no old forest, do full parse */
-    if (!old_content || !old_forest) {
+    /* Pattern extents and lexical alternatives may cross the edit boundary.
+       Semantic actions must evaluate a complete accepted derivation, rather
+       than a changed fragment. Use the full driver for those grammars. */
+    if (!old_content || !old_forest || parser->scannerless
+        || glr_scannerless_has_patterns(parser->grammar)
+        || glr_grammar_has_semantic_actions(parser->grammar)) {
         glr_parse_result_t result = glr_parse(parser, new_content, new_len);
         if (result.error != GLR_PARSE_SUCCESS) {
             return -1;

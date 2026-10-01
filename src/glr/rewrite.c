@@ -1,4 +1,5 @@
 #include <glr/rewrite.h>
+#include "grammar-internal.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -311,9 +312,7 @@ glr_rewrite_remove_production_at (glr_grammar_t *grammar, size_t index)
     }
 
   production = grammar->productions[index];
-  free (production->body);
-  free (production->annotation);
-  free (production);
+  glr_grammar_production_destroy (production);
 
   for (i = index + 1; i < grammar->production_count; i++)
     {
@@ -341,8 +340,7 @@ glr_rewrite_remove_symbol_at (glr_grammar_t *grammar, size_t index)
       grammar->start_symbol = NULL;
     }
 
-  free (symbol->name);
-  free (symbol);
+  glr_grammar_symbol_destroy (symbol);
 
   for (i = index + 1; i < grammar->symbol_count; i++)
     {
@@ -426,8 +424,7 @@ glr_rewrite_rebuild_grammar (glr_grammar_t *grammar, bool *keep_symbols,
             {
               grammar->start_symbol = NULL;
             }
-          free (grammar->symbols[i]->name);
-          free (grammar->symbols[i]);
+          glr_grammar_symbol_destroy (grammar->symbols[i]);
           continue;
         }
 
@@ -439,9 +436,7 @@ glr_rewrite_rebuild_grammar (glr_grammar_t *grammar, bool *keep_symbols,
     {
       if (!keep_productions[i])
         {
-          free (grammar->productions[i]->body);
-          free (grammar->productions[i]->annotation);
-          free (grammar->productions[i]);
+          glr_grammar_production_destroy (grammar->productions[i]);
           continue;
         }
 
@@ -453,8 +448,10 @@ glr_rewrite_rebuild_grammar (glr_grammar_t *grammar, bool *keep_symbols,
   free (grammar->productions);
   grammar->symbols = symbols;
   grammar->symbol_count = new_symbol_count;
+  grammar->symbol_capacity = new_symbol_count;
   grammar->productions = productions;
   grammar->production_count = new_production_count;
+  grammar->production_capacity = new_production_count;
 
   return GLR_REWRITE_STATUS_OK;
 }
@@ -1500,13 +1497,12 @@ glr_rewrite_rename_symbol (glr_grammar_t *grammar, const char *old_name,
       return GLR_REWRITE_STATUS_CONFLICT;
     }
 
-  replacement = glr_rewrite_strdup (new_name);
+  replacement = (char *) glr_stringpool_intern (grammar->strings, new_name);
   if (replacement == NULL)
     {
       return GLR_REWRITE_STATUS_MEMORY_ERROR;
     }
 
-  free (symbol->name);
   symbol->name = replacement;
   return GLR_REWRITE_STATUS_OK;
 }

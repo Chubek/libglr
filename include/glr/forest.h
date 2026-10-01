@@ -81,6 +81,8 @@ extern "C"
      * spans the whole input, so it is the entry point for tree walks.
      */
     glr_forest_node_t *root;
+    size_t node_capacity; ///< Internal position-vector capacity
+    size_t edge_capacity; ///< Internal edge-vector capacity
   } glr_forest_t;
 
   /**
@@ -258,8 +260,22 @@ extern "C"
    * @return Packed symbol node, or NULL on allocation failure
    */
   glr_forest_node_t *glr_forest_get_symbol (glr_forest_t *forest,
-                                            int nonterminal_id, size_t start,
-                                            size_t end);
+                                             int nonterminal_id, size_t start,
+                                             size_t end);
+
+  /** Pack a terminal by its complete byte span. */
+  glr_forest_node_t *glr_forest_get_terminal (glr_forest_t *forest,
+                                             int terminal_id, size_t start,
+                                             size_t end);
+
+  /** Pack a production by its span AND ordered body children. Distinct splits
+      of the same production over the same span remain distinct alternatives.
+      Repeated/empty body positions are preserved, rather than deduplicated. */
+  glr_forest_node_t *glr_forest_pack_production (glr_forest_t *forest,
+                                                int production_id, size_t start,
+                                                size_t end,
+                                                glr_forest_node_t *const *children,
+                                                size_t child_count);
 
   /**
    * @brief Report whether a forest encodes more than one derivation.

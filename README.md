@@ -17,8 +17,8 @@ shared parse forests, ambiguity management, and grammar normalization.
 - public grammar API for symbols, productions, and start symbols
 - LR(1) parse-table generation from a grammar, with no table-generation step
   to run beforehand
-- a real shift/reduce engine that keeps one stack per live reading of the
-  input, so a conflicting grammar is explored rather than silently truncated
+- a shift/reduce engine with immutable configurations, a cursor-ordered agenda,
+  and hash-based merging of equivalent GLR paths
 - a Shared Packed Parse Forest with per-span constructors, DAG traversal, and
   an ambiguity predicate
 - disambiguation hooks that prune conflicting stacks
@@ -33,6 +33,10 @@ shared parse forests, ambiguity management, and grammar normalization.
 - AST building from queries, with the AST itself defined in S-expression form
   and serializable back to S-expressions
 - the parse forest as an XML event stream
+- scannerless terminal patterns, with overlapping terminals and all matching
+  prefix lengths retained until the grammar determines the accepted readings
+- deferred semantic actions with `$1`, `$alias`, and `$LEXEME` selectors
+- thread-safe string interning, persistent worker pools, and indexed parallel work
 
 ## Parsing in one minute
 
@@ -68,11 +72,11 @@ if (result.error == GLR_PARSE_SUCCESS)
 
 Two examples show the whole pipeline:
 
-- `examples/calc.c` builds a precedence grammar, parses, and evaluates the
-  resulting derivation. It also shows why trivia belongs in the tokenizer
-  rather than in grammar rules.
+- `examples/calc.c` uses a numeric terminal pattern and semantic actions to
+  evaluate a precedence grammar. It demonstrates `$LEXEME`, aliases, positional
+  selection, and application-owned semantic values.
 - `examples/ambiguous.c` uses a grammar that has no conflict-free LR(1) table
-  and reports how many readings the parser kept alive.
+  and reports the packed alternatives retained in its forest.
 
 To generate the table yourself (to inspect conflicts, or to reuse it):
 
@@ -120,6 +124,50 @@ glr_live_parser_get_stats (live, &stats);
 The end position is exclusive, so an insertion is two equal positions with
 something to insert. `examples/live.c` edits a document and prints what each
 update re-parsed.
+
+For pattern grammars and ambiguous forests, live updates rebuild the full parse
+to retain lexical alternatives and account for tokens growing across an edit.
+
+## Scannerless patterns and semantic actions
+
+Terminals can have a literal spelling independent of their name, or a POSIX
+extended regular expression:
+
+```c
+int number = glr_grammar_add_symbol (grammar, GLR_SYMBOL_TERMINAL, "NUMBER");
+glr_scannerless_set_pattern (grammar, number, "[0-9]+", error, sizeof error);
+```
+
+The parser matches patterns directly against byte input, including UTF-8. It
+explores all matching nonempty prefixes and overlapping terminals. Patterns
+activate scannerless parsing automatically; `glr_parser_set_scannerless()` also
+enables it for literal-only grammars. Unconfigured terminals match their names.
+
+Register actions per production with `glr_production_set_semantic_action()`.
+Actions run bottom-up after an accepted derivation has been validated and
+selected, once per shared constructor. Select matched symbols from the action's
+`context->selection`:
+
+```c
+glr_production_set_alias (grammar, production_id, 1, "lhs");
+glr_production_set_alias (grammar, production_id, 3, "rhs");
+
+/* Inside an action: */
+glr_selection_t lhs, rhs;
+glr_select (&context->selection, "$lhs", &lhs);
+glr_select (&context->selection, "$3", &rhs);
+/* lhs.value/rhs.value are child values; lexeme/length are source slices. */
+```
+
+`$LEXEME` selects the terminal of a production whose body is exactly one
+terminal. Positions are one-based. Source slices are length-delimited; use
+`glr_stringpool_intern_n()` when a stable NUL-terminated copy is useful.
+The start-production value is returned in `glr_parse_result_t.semantic_value`.
+Ambiguous semantic evaluations require `glr_parser_set_semantic_resolver()`;
+unresolved ambiguity returns `GLR_PARSE_ERROR_SEMANTIC` before any actions run.
+
+See [the scannerless and runtime guide](docs/scannerless-and-runtime.md) for
+ownership rules, threading APIs, pattern syntax, and implementation details.
 
 ## Queries over a parse forest
 
@@ -170,7 +218,14 @@ Useful options:
 - `BUILD_REWRITELIB=ON` installs the standard `.grl` programs.
 - `BUILD_DISAMBSTD=ON` builds the standard disambiguation helpers.
 - `BUILD_SWIG_BINDINGS=ON` enables the SWIG-based Python module when SWIG is available.
-- `ENABLE_TEST_SANITIZERS=ON` enables address/undefined sanitizers for the test binaries.
+- `ENABLE_TEST_SANITIZERS=ON` instruments the library and test binaries with
+  address/undefined sanitizers.
+- `BUILD_SHAREDLIB=ON` builds `libglr.so`; the default is `libglr.a`.
+
+Installed CMake clients can use `find_package(libglr 1.0 REQUIRED)` and link
+`libglr::libglr`. The exported target supplies its threading and storage
+dependencies. For compiler commands, use `pkg-config --cflags --libs libglr`,
+adding `--static` when linking the static library.
 
 CTest labels are organized so focused runs are easy:
 

@@ -2,6 +2,7 @@
 #define GLR_GRAMMAR_H
 
 #include <glr/parsetbl.h>
+#include <glr/stringpool.h>
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -42,7 +43,8 @@ extern "C"
   {
     glr_symbol_type_t type; ///< Type of symbol
     int id;                 ///< Unique identifier
-    char *name;             ///< Symbol name (e.g., "+", "expression")
+    char *name;             ///< Interned name; owned by grammar, immutable
+    struct glr_terminal_pattern *pattern; ///< Optional scannerless pattern
   } glr_symbol_t;
 
   /**
@@ -59,6 +61,8 @@ extern "C"
     glr_symbol_t **body; ///< Body symbols (array)
     size_t body_length;  ///< Number of symbols in body
     char *annotation;    ///< Optional production annotation
+    const char **aliases; ///< Optional one alias per body position
+    struct glr_semantic_action *semantic_action; ///< Deferred action
   } glr_production_t;
 
   /**
@@ -78,6 +82,9 @@ extern "C"
     char *name;                     ///< Grammar name
     glr_parse_table_t *parse_table; ///< Optional parse table for LR/GLR actions
     bool owns_parse_table;          ///< Whether the grammar destroys parse_table
+    glr_stringpool_t *strings;      ///< Interned symbol names and aliases
+    size_t symbol_capacity;         ///< Internal symbol vector capacity
+    size_t production_capacity;     ///< Internal production vector capacity
   } glr_grammar_t;
 
   /**

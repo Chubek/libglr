@@ -9,14 +9,12 @@
  *   expr -> 'n'
  *
  * The grammar has no conflict-free LR(1) table, so libglr reports conflicts
- * when it builds one. The parser then keeps a separate stack per reading of
- * the input, which is the GLR part: nothing is thrown away and a
- * disambiguator gets to choose. Run the example to see how many stacks
- * survive for a given expression.
+ * when it builds one. The parser explores the conflicting configurations and
+ * merges equivalent paths into a Shared Packed Parse Forest. Accepted stacks
+ * sharing the same packed root are retained once; distinct readings remain
+ * under the forest's symbol nodes.
  *
- * For "n*n+n" the surviving readings differ, so the reported stack count is
- * the honest measure of how much ambiguity the input still carries. The
- * Shared Packed Parse Forest records what was built, and
+ * For "n*n+n" the root packs both possible associations, and
  * glr_forest_is_ambiguous() reports whether more than one derivation is
  * packed under the root.
  *
@@ -146,7 +144,7 @@ main (int argc, char *argv[])
   printf ("Error: %d\n", result.error);
   printf ("Position: %zu\n", result.position);
   printf ("Input consumed: %zu/%zu\n", result.position, strlen (input));
-  printf ("Active stacks: %zu\n", glr_parser_stack_count (parser));
+  printf ("Accepted roots: %zu\n", glr_parser_stack_count (parser));
 
   if (result.error != GLR_PARSE_SUCCESS)
     {
@@ -165,11 +163,12 @@ main (int argc, char *argv[])
           printf ("Forest: %zu packed nodes, %zu reachable from the root\n",
                   glr_forest_total_nodes (forest), visited);
           printf ("Packed node depth: %zu\n", max_depth);
+          printf ("Root production alternatives: %zu\n", forest->root->child_count);
           printf ("More than one derivation packed: %s\n",
                   glr_forest_is_ambiguous (forest->root) ? "yes" : "no");
         }
-      printf ("\nEach live stack is one reading of the input that the parser\n"
-              "kept alive. Register a disambiguator to prune them.\n");
+      printf ("\nPacked alternatives preserve the input's distinct readings.\n"
+              "Register a disambiguator to select among conflicting LR actions.\n");
     }
 
   glr_parser_destroy (parser);

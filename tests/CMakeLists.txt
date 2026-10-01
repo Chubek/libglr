@@ -38,6 +38,9 @@ glr_add_test(test_stratified SOURCES test_stratified.c LABELS "unit;core;stratif
 glr_add_test(test_stratified_sppf SOURCES test_stratified_sppf.c LABELS "unit;core;stratified;forest")
 glr_add_test(test_live_parsing SOURCES test_live_parsing.c LABELS "unit;core;live")
 glr_add_test(test_query SOURCES test_query.c LABELS "unit;core;query")
+glr_add_test(test_scannerless SOURCES test_scannerless.c LABELS "unit;core;scannerless")
+glr_add_test(test_semantic_action SOURCES test_semantic_action.c LABELS "unit;core;semantic")
+glr_add_test(test_thread SOURCES test_thread.c LABELS "unit;core;thread")
 
 # Stratified suite needs the same feature macros as the library so the
 # cache-backed cases compile in when the incremental cache is enabled.
@@ -79,6 +82,9 @@ add_custom_target(check
         test_stratified_sppf
         test_live_parsing
         test_query
+        test_scannerless
+        test_semantic_action
+        test_thread
         test_ambiguity
     USES_TERMINAL)
 

@@ -234,6 +234,8 @@ extern "C"
    */
   glr_stack_t *glr_stack_copy (const glr_stack_t *stack);
 
+  int glr_stack_reset (glr_stack_t *stack);
+
   /**
    * @brief Const-friendly accessors, for inspecting a stack the caller does not
    *        own, such as a snapshot handed to a resume.
@@ -338,11 +340,7 @@ extern "C"
   {
     if (stack != NULL)
       {
-        for (size_t i = 0; i < stack->height; i++)
-          {
-            stack->states[i] = NULL;
-          }
-        stack->height = 0;
+        glr_stack_reset (stack);
       }
   }
 

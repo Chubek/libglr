@@ -978,12 +978,12 @@ builtin_rename (glr_query_context_t *context, const glr_query_match_t *match,
     }
 
     {
-        char *renamed = query_strdup (name);
+        char *renamed = (char *) glr_stringpool_intern (
+            context->mutable_grammar->strings, name);
         if (renamed == NULL)
         {
             return GLR_QUERY_ACTION_CONTINUE;
         }
-        free (symbol->name);
         symbol->name = renamed;
     }
     return GLR_QUERY_ACTION_CONTINUE;
