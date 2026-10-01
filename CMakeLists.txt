@@ -127,8 +127,8 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 
 # Configure header with HAVE_LMDB
 configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/glr/config.h.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/include/glr/config.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/config.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/cmake/config.h"
 )
 
 # Set include directories
