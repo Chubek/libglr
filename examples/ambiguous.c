@@ -2,20 +2,26 @@
  * @file ambiguous.c
  * @brief Ambiguity handling example using LibGLR
  *
- * This example demonstrates GLR's ability to handle ambiguous grammars.
+ * This example demonstrates how a genuinely ambiguous grammar behaves:
  *
- * Consider the classic ambiguous grammar:
- *   expr -> expr + expr
- *   expr -> expr * expr
- *   expr -> NUMBER
+ *   expr -> expr '+' expr
+ *   expr -> expr '*' expr
+ *   expr -> 'n'
  *
- * For input "1 + 2 * 3", this grammar has two parses:
- *  1. (1 + 2) * 3 = 9
- *  2. 1 + (2 * 3) = 7
+ * The grammar has no conflict-free LR(1) table, so libglr reports conflicts
+ * when it builds one. The parser then keeps a separate stack per reading of
+ * the input, which is the GLR part: nothing is thrown away and a
+ * disambiguator gets to choose. Run the example to see how many stacks
+ * survive for a given expression.
  *
- * GLR parses both possibilities simultaneously.
+ * For "n*n+n" the surviving readings differ, so the reported stack count is
+ * the honest measure of how much ambiguity the input still carries. The
+ * Shared Packed Parse Forest records what was built, and
+ * glr_forest_is_ambiguous() reports whether more than one derivation is
+ * packed under the root.
  *
  * Usage: ./ambiguous <expression>
+ * Example: ./ambiguous "n*n+n"
  */
 
 #include <glr/glr.h>
@@ -24,122 +30,150 @@
 #include <string.h>
 
 /**
- * @brief Build ambiguous grammar
- *
- * Creates a deliberately ambiguous grammar for demonstration.
+ * @brief Build the deliberately ambiguous grammar
  */
 static glr_grammar_t *
 create_ambiguous_grammar (void)
 {
   glr_grammar_t *grammar = glr_grammar_create ();
+  int expr;
+  int num;
+  int plus;
+  int multiply;
+  glr_symbol_t *body[3];
+
   if (grammar == NULL)
     {
       return NULL;
     }
 
-  /* Add symbols */
-  int tok_number
-      = glr_grammar_add_symbol (grammar, GLR_SYMBOL_TERMINAL, "NUMBER");
-  int tok_plus = glr_grammar_add_symbol (grammar, GLR_SYMBOL_TERMINAL, "+");
-  int tok_multiply
-      = glr_grammar_add_symbol (grammar, GLR_SYMBOL_TERMINAL, "*");
+  expr = glr_grammar_add_symbol (grammar, GLR_SYMBOL_NONTERMINAL, "expr");
+  num = glr_grammar_add_symbol (grammar, GLR_SYMBOL_TERMINAL, "n");
+  plus = glr_grammar_add_symbol (grammar, GLR_SYMBOL_TERMINAL, "+");
+  multiply = glr_grammar_add_symbol (grammar, GLR_SYMBOL_TERMINAL, "*");
 
-  int expr = glr_grammar_add_symbol (grammar, GLR_SYMBOL_NONTERMINAL, "expr");
+  /* expr -> expr '+' expr */
+  body[0] = glr_grammar_get_symbol (grammar, expr);
+  body[1] = glr_grammar_get_symbol (grammar, plus);
+  body[2] = glr_grammar_get_symbol (grammar, expr);
+  glr_grammar_add_production (grammar, expr, body, 3);
 
-  /* Ambiguous productions */
-  /* expr -> expr + expr */
-  glr_symbol_t *plus_body[] = { glr_grammar_get_symbol (grammar, expr),
-                                glr_grammar_get_symbol (grammar, tok_plus),
-                                glr_grammar_get_symbol (grammar, expr) };
-  glr_grammar_add_production (grammar, expr, plus_body, 3);
+  /* expr -> expr '*' expr */
+  body[1] = glr_grammar_get_symbol (grammar, multiply);
+  glr_grammar_add_production (grammar, expr, body, 3);
 
-  /* expr -> expr * expr */
-  glr_symbol_t *mult_body[] = { glr_grammar_get_symbol (grammar, expr),
-                                glr_grammar_get_symbol (grammar, tok_multiply),
-                                glr_grammar_get_symbol (grammar, expr) };
-  glr_grammar_add_production (grammar, expr, mult_body, 3);
+  /* expr -> n */
+  body[0] = glr_grammar_get_symbol (grammar, num);
+  glr_grammar_add_production (grammar, expr, body, 1);
 
-  /* expr -> NUMBER */
-  glr_symbol_t *num_body[] = { glr_grammar_get_symbol (grammar, tok_number) };
-  glr_grammar_add_production (grammar, expr, num_body, 1);
-
-  /* Set start symbol */
   glr_grammar_set_start_symbol (grammar, expr);
-
   return grammar;
+}
+
+/**
+ * @brief Report how the parse went, including what ambiguity survived
+ */
+static void
+print_visit (glr_forest_node_t *node, size_t depth, void *user_data)
+{
+  size_t *max_depth = user_data;
+
+  if (max_depth != NULL && depth > *max_depth)
+    {
+      *max_depth = depth;
+    }
+  (void) node;
 }
 
 int
 main (int argc, char *argv[])
 {
+  glr_grammar_t *grammar;
+  glr_parser_t *parser;
+  glr_parse_table_t *table;
+  glr_parse_result_t result;
+  char error[128];
+  const char *input;
+
   if (argc < 2)
     {
       printf ("Usage: %s <expression>\n", argv[0]);
-      printf ("Example: %s \"1 + 2 * 3\"\n", argv[0]);
+      printf ("Example: %s \"n*n+n\"\n", argv[0]);
       return 1;
     }
-
-  const char *input = argv[1];
+  input = argv[1];
 
   printf ("=== LibGLR Ambiguous Grammar Example ===\n\n");
   printf ("Input: %s\n\n", input);
   printf ("Grammar (ambiguous):\n");
-  printf ("  expr -> expr + expr\n");
-  printf ("  expr -> expr * expr\n");
-  printf ("  expr -> NUMBER\n\n");
-  printf ("This grammar is ambiguous: \"1 + 2 * 3\" has two parses:\n");
-  printf ("  1. (1 + 2) * 3 = 9\n");
-  printf ("  2. 1 + (2 * 3) = 7\n\n");
+  printf ("  expr -> expr '+' expr\n");
+  printf ("  expr -> expr '*' expr\n");
+  printf ("  expr -> n\n\n");
 
-  /* Create ambiguous grammar */
-  glr_grammar_t *grammar = create_ambiguous_grammar ();
+  grammar = create_ambiguous_grammar ();
   if (grammar == NULL)
     {
-      fprintf (stderr, "Failed to create grammar\n");
+      fprintf (stderr, "failed to create grammar\n");
       return 1;
     }
+  printf ("Grammar: %zu symbols, %zu productions\n", grammar->symbol_count,
+          grammar->production_count);
 
-  printf ("Grammar created successfully\n");
-  printf ("  Symbols: %zu\n", grammar->symbol_count);
-  printf ("  Productions: %zu\n\n", grammar->production_count);
-
-  /* Create parser */
-  glr_parser_t *parser = glr_parser_create (grammar);
-  if (parser == NULL)
+  memset (error, 0, sizeof (error));
+  table = glr_grammar_build_parse_table (grammar, error, sizeof (error));
+  if (table == NULL)
     {
-      fprintf (stderr, "Failed to create parser\n");
+      fprintf (stderr, "failed to build parse table: %s\n", error);
       glr_grammar_destroy (grammar);
       return 1;
     }
+  printf ("Parse table: %zu states, %zu conflicts\n", table->state_count,
+          glr_parse_table_conflict_count (table));
 
-  /* Parse */
-  printf ("Parsing...\n");
-  glr_parse_result_t result = glr_parse (parser, input, strlen (input));
+  parser = glr_parser_create (grammar);
+  if (parser == NULL)
+    {
+      fprintf (stderr, "failed to create parser\n");
+      glr_parse_table_destroy (table);
+      glr_grammar_destroy (grammar);
+      return 1;
+    }
+  glr_parser_set_parse_table (parser, table, false);
+
+  result = glr_parse (parser, input, strlen (input));
 
   printf ("\n=== Parse Result ===\n");
   printf ("Error: %d\n", result.error);
   printf ("Position: %zu\n", result.position);
-  printf ("Active stacks: %zu\n", glr_parser_stack_count (parser));
   printf ("Input consumed: %zu/%zu\n", result.position, strlen (input));
+  printf ("Active stacks: %zu\n", glr_parser_stack_count (parser));
 
-  if (result.error == GLR_PARSE_SUCCESS)
+  if (result.error != GLR_PARSE_SUCCESS)
     {
-      printf ("\nParse successful!\n");
-      printf ("Multiple stacks indicate ambiguity was detected.\n");
-
-      glr_forest_t *forest = glr_parser_get_forest (parser);
-      if (forest != NULL)
-        {
-          printf ("Parse forest created: valid\n");
-        }
+      printf ("\nParse failed.\n");
     }
   else
     {
-      printf ("\nParse failed with error: %d\n", result.error);
+      glr_forest_t *forest = result.forest;
+      size_t max_depth = 0;
+
+      printf ("\nParse succeeded.\n");
+      if (forest != NULL)
+        {
+          size_t visited = glr_forest_visit (forest, forest->root, print_visit,
+                                             &max_depth);
+          printf ("Forest: %zu packed nodes, %zu reachable from the root\n",
+                  glr_forest_total_nodes (forest), visited);
+          printf ("Packed node depth: %zu\n", max_depth);
+          printf ("More than one derivation packed: %s\n",
+                  glr_forest_is_ambiguous (forest->root) ? "yes" : "no");
+        }
+      printf ("\nEach live stack is one reading of the input that the parser\n"
+              "kept alive. Register a disambiguator to prune them.\n");
     }
 
-  /* Cleanup */
   glr_parser_destroy (parser);
+  glr_parse_table_destroy (table);
   glr_grammar_destroy (grammar);
 
   return result.error == GLR_PARSE_SUCCESS ? 0 : 1;

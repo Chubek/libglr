@@ -253,3 +253,50 @@ glr_parse_table_get_goto(const glr_parse_table_t *table,
 
     return -1;
 }
+
+size_t
+glr_parse_table_action_count(const glr_parse_table_t *table,
+                             uint32_t state,
+                             uint32_t terminal)
+{
+    const glr_action_set_t *set;
+
+    if (!table)
+        return 0;
+
+    if (state >= table->state_count ||
+        terminal >= table->terminal_count)
+        return 0;
+
+    set = &table->states[state].action_table[terminal];
+    return set->action_count;
+}
+
+bool
+glr_parse_table_has_conflict(const glr_parse_table_t *table,
+                             uint32_t state,
+                             uint32_t terminal)
+{
+    return glr_parse_table_action_count(table, state, terminal) > 1;
+}
+
+size_t
+glr_parse_table_conflict_count(const glr_parse_table_t *table)
+{
+    size_t conflicts = 0;
+    size_t s;
+    size_t t;
+
+    if (!table)
+        return 0;
+
+    for (s = 0; s < table->state_count; ++s) {
+        for (t = 0; t < table->terminal_count; ++t) {
+            if (glr_parse_table_has_conflict(table, (uint32_t)s,
+                                             (uint32_t)t))
+                conflicts++;
+        }
+    }
+
+    return conflicts;
+}

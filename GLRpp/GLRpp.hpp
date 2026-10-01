@@ -228,9 +228,15 @@ public:
       }
     for (size_t i = 0; i < forest_->node_count; ++i)
       {
+        /* SPPF ambiguity shows up as a sibling chain: more than one
+           packed node sharing the same input position. A large
+           child_count on a single node is normal derivation width,
+           not ambiguity. */
+        size_t chain = 0;
         for (auto *n = forest_->nodes[i]; n != nullptr; n = n->next)
           {
-            if (n->child_count > 1)
+            ++chain;
+            if (chain > 1)
               {
                 return true;
               }
@@ -241,7 +247,27 @@ public:
   size_t
   num_parses () const noexcept
   {
-    return is_ambiguous () ? 2u : 1u;
+    if (!forest_)
+      {
+        return 0u;
+      }
+    /* Count the widest sibling chain: each packed alternative at the
+       most ambiguous position is a distinct parse. Non-ambiguous
+       forests yield exactly one parse. */
+    size_t widest = 1u;
+    for (size_t i = 0; i < forest_->node_count; ++i)
+      {
+        size_t chain = 0;
+        for (auto *n = forest_->nodes[i]; n != nullptr; n = n->next)
+          {
+            ++chain;
+          }
+        if (chain > widest)
+          {
+            widest = chain;
+          }
+      }
+    return widest;
   }
   ParseTreeNode
   root () const
@@ -408,13 +434,28 @@ private:
   Symbol
   add_symbol (std::string_view name, glr_symbol_type_t type)
   {
+    if (name.empty ())
+      {
+        throw std::runtime_error ("symbol name must not be empty");
+      }
     auto key = std::string (name);
     auto it = symbol_map_.find (key);
     if (it != symbol_map_.end ())
       {
         auto *sym = glr_grammar_get_symbol (handle_.get (), it->second);
-        return Symbol (it->second, key,
-                       sym && sym->type == GLR_SYMBOL_TERMINAL);
+        if (!sym)
+          {
+            throw std::runtime_error ("symbol map out of sync with grammar");
+          }
+        const bool want_terminal = type == GLR_SYMBOL_TERMINAL;
+        const bool have_terminal = sym->type == GLR_SYMBOL_TERMINAL;
+        if (want_terminal != have_terminal)
+          {
+            throw std::runtime_error (
+                "symbol '" + key
+                + "' already exists with a different kind");
+          }
+        return Symbol (it->second, key, have_terminal);
       }
     int id = glr_grammar_add_symbol (handle_.get (), type, key.c_str ());
     if (id < 0)
@@ -525,6 +566,19 @@ public:
       };
     return *this;
   }
+  DisambiguationBuilder &
+  reject_candidate (size_t index)
+  {
+    clauses_.back ().action = [index] (DisambiguationContext &ctx, size_t &)
+      {
+        if (index < ctx.candidate_count ())
+          {
+            ctx.reject (index);
+          }
+        return GLR_DISAMBIG_NO_MATCH;
+      };
+    return *this;
+  }
   DisambiguationHook
   build (std::string_view name = "custom", int priority = 0)
   {
@@ -616,7 +670,10 @@ public:
     auto result = glr_parse (handle_.get (), input.data (), input.size ());
     if (result.error != GLR_PARSE_SUCCESS)
       {
-        return ParseResult::from_err ("glr_parse failed");
+        return ParseResult::from_err ("glr_parse failed with error code "
+                                      + std::to_string (result.error)
+                                      + " at position "
+                                      + std::to_string (result.position));
       }
     return ParseResult::from_ok (ParseTree (result.forest));
   }

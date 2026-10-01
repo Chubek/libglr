@@ -36,11 +36,14 @@
 #include "grammar.h"
 #include "graph.h"
 #include "lexer-hooks.h"
+#include "live-parsing.h"
 #include "parsetbl.h"
 #include "parser.h"
 #include "reader.h"
 #include "rewrite.h"
+#include "query.h"
 #include "reduction.h"
+#include "serialization.h"
 #include "stack.h"
 
 #ifdef __cplusplus

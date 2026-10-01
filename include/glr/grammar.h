@@ -170,6 +170,80 @@ extern "C"
   glr_parse_table_t *glr_grammar_get_parse_table (const glr_grammar_t *grammar);
 
   /**
+   * @brief Find a symbol id by name and type.
+   *
+   * @param grammar Grammar to search (may be NULL)
+   * @param name Symbol name (may be NULL)
+   * @param type Required symbol type
+   * @return Symbol id (>= 0), or -1 when not found
+   */
+  int glr_grammar_find_symbol (const glr_grammar_t *grammar, const char *name,
+                               glr_symbol_type_t type);
+
+  /**
+   * @brief Find a symbol id by name regardless of type.
+   *
+   * @param grammar Grammar to search (may be NULL)
+   * @param name Symbol name (may be NULL)
+   * @return Symbol id (>= 0), or -1 when not found
+   */
+  int glr_grammar_find_symbol_any (const glr_grammar_t *grammar,
+                                   const char *name);
+
+  /**
+   * @brief Validate structural invariants of a grammar.
+   *
+   * Checks that a start symbol is set, every production head is a
+   * non-terminal owned by the grammar, and every body symbol belongs
+   * to the grammar.
+   *
+   * @param grammar Grammar to validate (may be NULL)
+   * @param error Optional error buffer (may be NULL)
+   * @param error_size Size of the error buffer in bytes
+   * @return true when valid, false otherwise
+   */
+  bool glr_grammar_validate (const glr_grammar_t *grammar, char *error,
+                             size_t error_size);
+
+  /**
+   * @brief Build an SLR(1) parse table for a grammar.
+   *
+   * Constructs canonical LR(0) item sets and derives ACTION/GOTO entries
+   * with FOLLOW-based reductions. The generated table is indexed by the
+   * grammar's symbol ids plus one extra end-of-input column
+   * (@ref GLR_PARSE_TABLE_EOF_TERMINAL) that carries the accept action.
+   *
+   * @param grammar Grammar to analyze (may be NULL)
+   * @param error Optional error buffer (may be NULL)
+   * @param error_size Size of @p error in bytes
+   * @return New parse table owned by the caller, or NULL on failure
+   *
+   * @note Destroy the result with glr_parse_table_destroy().
+   * @see glr_grammar_set_parse_table
+   */
+  glr_parse_table_t *glr_grammar_build_parse_table (const glr_grammar_t *grammar,
+                                                    char *error,
+                                                    size_t error_size);
+
+  /**
+   * @brief Get the number of symbols in a grammar (null-safe).
+   */
+  static inline size_t
+  glr_grammar_symbol_count (const glr_grammar_t *grammar)
+  {
+    return grammar != NULL ? grammar->symbol_count : 0;
+  }
+
+  /**
+   * @brief Get the number of productions in a grammar (null-safe).
+   */
+  static inline size_t
+  glr_grammar_production_count (const glr_grammar_t *grammar)
+  {
+    return grammar != NULL ? grammar->production_count : 0;
+  }
+
+  /**
    * @brief Check if a symbol is a terminal
    *
    * @param symbol Pointer to symbol

@@ -271,11 +271,22 @@ extern "C"
 
   /**
    * @ingroup rewrite_api
-   * @brief Conservative ambiguity-reduction pipeline.
+   * @brief Ambiguity-reduction pipeline with a verifiable result.
    *
-   * This helper currently delegates to the LR-normalization pipeline and then
-   * removes now-useless symbols. It is intended as a safe normalization pass,
-   * not as a full ambiguity prover.
+   * Runs the LR-normalization pipeline (epsilon removal, unit removal,
+   * left-recursion elimination, left factoring, useless-symbol removal) and
+   * then *verifies* the outcome by building a parse table for the result.
+   *
+   * @return GLR_REWRITE_STATUS_OK when the rewritten grammar has a
+   *         conflict-free parse table, GLR_REWRITE_STATUS_CONFLICT when
+   *         conflicts remain (the grammar is still ambiguous, and no
+   *         normalization pass can fix that in general), or the failing
+   *         status of an underlying pass.
+   *
+   * @note This is a normalization pass, not an ambiguity prover: a grammar
+   *       such as `E -> E + E | E * E | n` stays ambiguous, and the
+   *       GLR_REWRITE_STATUS_CONFLICT result says so instead of leaving the
+   *       caller to guess.
    */
   glr_rewrite_status_t glr_rewrite_eliminate_ambiguity (
       glr_grammar_t *grammar);

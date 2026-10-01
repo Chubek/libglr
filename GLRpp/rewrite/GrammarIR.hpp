@@ -76,6 +76,18 @@ struct GrammarIR
     std::unordered_map<int, bool> symbol_ids;
     for (const auto &symbol : symbols)
       {
+        if (symbol.id < 0)
+          {
+            if (error)
+              *error = "symbol id must be non-negative";
+            return false;
+          }
+        if (symbol.name.empty ())
+          {
+            if (error)
+              *error = "symbol name must not be empty";
+            return false;
+          }
         if (!symbol_ids.emplace (symbol.id, true).second)
           {
             if (error)
@@ -94,6 +106,12 @@ struct GrammarIR
     std::unordered_map<int, bool> production_ids;
     for (const auto &production : productions)
       {
+        if (production.id < 0)
+          {
+            if (error)
+              *error = "production id must be non-negative";
+            return false;
+          }
         if (!production_ids.emplace (production.id, true).second)
           {
             if (error)

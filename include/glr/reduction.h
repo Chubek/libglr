@@ -73,6 +73,31 @@ extern "C"
   void glr_item_set_destroy (glr_item_set_t *set);
 
   /**
+   * @brief Remove all items from a set without destroying it.
+   *
+   * @param set Pointer to item set (may be NULL)
+   */
+  void glr_item_set_clear (glr_item_set_t *set);
+
+  /**
+   * @brief Get the number of items in a set.
+   *
+   * @param set Pointer to item set (may be NULL)
+   * @return Item count, or 0 for NULL
+   */
+  size_t glr_item_set_size (const glr_item_set_t *set);
+
+  /**
+   * @brief Get one item by index.
+   *
+   * @param set Pointer to item set
+   * @param index Item index
+   * @return Item pointer, or NULL on invalid input
+   */
+  const glr_item_t *glr_item_set_get (const glr_item_set_t *set,
+                                      size_t index);
+
+  /**
    * @brief Add an item to an item set
    *
    * @param set Pointer to item set
@@ -107,11 +132,29 @@ extern "C"
    *
    * @param item Pointer to item
    * @return true if complete, false otherwise
+   *
+   * @note This predicate only checks that the dot advanced past the
+   *       start position. Use glr_item_is_complete_for_production()
+   *       when the production length is known.
    */
   static inline bool
   glr_item_is_complete (glr_item_t *item)
   {
     return item != NULL && item->dot > 0;
+  }
+
+  /**
+   * @brief Check completion against a known production length.
+   *
+   * @param item Pointer to item (may be NULL)
+   * @param body_length Production right-hand-side length
+   * @return true when dot >= body_length
+   */
+  static inline bool
+  glr_item_is_complete_for_production (const glr_item_t *item,
+                                       size_t body_length)
+  {
+    return item != NULL && item->dot >= body_length;
   }
 
   /**

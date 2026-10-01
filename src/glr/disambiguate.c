@@ -139,6 +139,28 @@ size_t
 glr_disambig_context_last_active (const glr_disambig_context_t *context)
 {
   size_t i;
+  size_t last = SIZE_MAX;
+
+  if (context == NULL || context->candidates == NULL)
+    {
+      return SIZE_MAX;
+    }
+
+  for (i = 0; i < context->candidate_count; i++)
+    {
+      if (!context->candidates[i].rejected)
+        {
+          last = i;
+        }
+    }
+
+  return last;
+}
+
+size_t
+glr_disambig_context_first_active (const glr_disambig_context_t *context)
+{
+  size_t i;
 
   if (context == NULL || context->candidates == NULL)
     {
@@ -154,6 +176,53 @@ glr_disambig_context_last_active (const glr_disambig_context_t *context)
     }
 
   return SIZE_MAX;
+}
+
+size_t
+glr_parser_disambiguator_count (const glr_parser_t *parser)
+{
+  const glr_disambig_hook_t *hook;
+  size_t count = 0;
+
+  if (parser == NULL)
+    {
+      return 0;
+    }
+
+  for (hook = parser->disambig_hooks; hook != NULL; hook = hook->next)
+    {
+      count++;
+    }
+
+  return count;
+}
+
+int
+glr_parser_remove_disambiguator (glr_parser_t *parser, const char *name)
+{
+  glr_disambig_hook_t **slot;
+
+  if (parser == NULL || name == NULL)
+    {
+      return -1;
+    }
+
+  for (slot = &parser->disambig_hooks; *slot != NULL; slot = &(*slot)->next)
+    {
+      const char *hook_name = (*slot)->name;
+      bool match = hook_name != NULL ? strcmp (hook_name, name) == 0
+                                     : name[0] == '\0';
+      if (match)
+        {
+          glr_disambig_hook_t *victim = *slot;
+          *slot = victim->next;
+          victim->next = NULL;
+          glr_disambig_hook_destroy (victim);
+          return 0;
+        }
+    }
+
+  return -1;
 }
 
 int

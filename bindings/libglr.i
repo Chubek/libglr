@@ -476,6 +476,8 @@ glr_binding_cache_stats_hit_rate (const glr_cache_stats_t *stats)
 %include "glr/disambiguate.h"
 %include "glr/rewrite.h"
 %include "glr/parser.h"
+%include "glr/live-parsing.h"
+%include "glr/query.h"
 %include "glr/glr.h"
 
 #ifdef HAVE_LMDB

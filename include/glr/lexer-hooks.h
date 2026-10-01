@@ -71,6 +71,40 @@ extern "C"
   void glr_lexer_hooks_set_user_data (glr_lexer_hooks_t *hooks, void *user_data);
   void *glr_lexer_hooks_get_user_data (glr_lexer_hooks_t *hooks);
 
+  /**
+   * @brief Count hooks in a registry (null-safe).
+   *
+   * @param hooks Registry (may be NULL)
+   * @return Number of registered hooks
+   */
+  size_t glr_lexer_hooks_count (const glr_lexer_hooks_t *hooks);
+
+  /**
+   * @brief Remove one hook by name and destroy it.
+   *
+   * @param hooks Registry (may be NULL)
+   * @param name Hook name (NULL matches anonymous hooks only)
+   * @return 0 when removed, -1 when not found
+   */
+  int glr_lexer_hooks_remove (glr_lexer_hooks_t *hooks, const char *name);
+
+  /**
+   * @brief Dispatch one lexer event through the hook chain.
+   *
+   * Hooks run in priority order; the first hook that accepts the event
+   * (returns true with an accepted response consuming at least the
+   * default byte count) wins. The response is reset before dispatch
+   * and on total decline.
+   *
+   * @param hooks Registry (may be NULL, declines everything)
+   * @param event Event to dispatch (may be NULL, declines)
+   * @param response Output response (must be non-NULL)
+   * @return true when a hook accepted the event
+   */
+  bool glr_lexer_hooks_dispatch (glr_lexer_hooks_t *hooks,
+                                 const glr_lexer_event_t *event,
+                                 glr_lexer_response_t *response);
+
   const char *glr_lexer_unicode_name (uint32_t codepoint);
 
   static inline void

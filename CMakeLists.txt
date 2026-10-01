@@ -34,6 +34,11 @@ if(INSTALL_LOCAL)
 endif()
 
 if(ENABLE_CACHE)
+    # libglr vendors libmdbx as a library only. Its own test/examples
+    # subdirectory registers ctest entries (c_api, c++_api) for binaries
+    # that are never built under EXCLUDE_FROM_ALL, which would leave
+    # permanently "Not Run" entries in this project's ctest run.
+    set(MDBX_ENABLE_TESTS OFF CACHE BOOL "Disable libmdbx self-tests" FORCE)
     add_subdirectory(third_party/libmdbx EXCLUDE_FROM_ALL)
 
     if(TARGET mdbx-static)
@@ -88,6 +93,11 @@ install(DIRECTORY third_party/sfsexp/src/
     FILES_MATCHING PATTERN "*.h")
 
 # Library sources
+#
+# The incremental-support sources that do not require libmdbx
+# (diff, serialization, forest-merge, dependency, parser-incr) are always
+# built so glr_parser_parse_incremental() is available in every
+# configuration. Only cache.c needs the libmdbx backing store.
 set(GLR_SOURCES
     src/glr/grammar.c
     src/glr/stack.c
@@ -97,21 +107,25 @@ set(GLR_SOURCES
     src/glr/graph.c
     src/glr/parser.c
     src/glr/parsetbl.c
+    src/glr/lrtable.c
     src/glr/disambiguate.c
     src/glr/lexer-hooks.c
     src/glr/reader.c
     src/glr/rewrite.c
+    src/glr/diff.c
+    src/glr/serialization.c
+    src/glr/forest-merge.c
+    src/glr/dependency.c
+    src/glr/parser-incr.c
+    src/glr/live-parsing.c
+    src/glr/querylisp.c
+    src/glr/queryexec.c
 )
 
 # Add cache sources if LMDB is available
 if(HAVE_LMDB)
     list(APPEND GLR_SOURCES
         src/glr/cache.c
-        src/glr/parser-incr.c
-        src/glr/serialization.c
-        src/glr/diff.c
-        src/glr/dependency.c
-        src/glr/forest-merge.c
     )
 endif()
 
@@ -191,6 +205,12 @@ install(FILES
     include/glr/parsetbl.h
     include/glr/reader.h
     include/glr/rewrite.h
+    include/glr/dependency.h
+    include/glr/diff.h
+    include/glr/forest-merge.h
+    include/glr/serialization.h
+    include/glr/live-parsing.h
+    include/glr/query.h
     DESTINATION include/glr
 )
 
@@ -198,10 +218,6 @@ install(FILES
 if(HAVE_LMDB)
     install(FILES
         include/glr/cache.h
-        include/glr/dependency.h
-        include/glr/diff.h
-        include/glr/forest-merge.h
-        include/glr/serialization.h
         ${CMAKE_CURRENT_BINARY_DIR}/include/glr/config.h
         DESTINATION include/glr
     )

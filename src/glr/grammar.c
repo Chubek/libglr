@@ -3,6 +3,30 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* strdup() is not part of C11, so the library carries its own copy helper
+   to stay strictly conforming under -std=c11. */
+static char *
+glr_strdup (const char *text)
+{
+  size_t length;
+  char *copy;
+
+  if (text == NULL)
+    {
+      return NULL;
+    }
+
+  length = strlen (text);
+  copy = malloc (length + 1);
+  if (copy == NULL)
+    {
+      return NULL;
+    }
+
+  memcpy (copy, text, length + 1);
+  return copy;
+}
+
 glr_grammar_t *
 glr_grammar_create (void)
 {
@@ -69,7 +93,7 @@ int
 glr_grammar_add_symbol (glr_grammar_t *grammar, glr_symbol_type_t type,
                         const char *name)
 {
-  if (grammar == NULL || name == NULL)
+  if (grammar == NULL || name == NULL || name[0] == '\0')
     {
       return -1;
     }
@@ -83,7 +107,7 @@ glr_grammar_add_symbol (glr_grammar_t *grammar, glr_symbol_type_t type,
 
   symbol->type = type;
   symbol->id = (int)grammar->symbol_count;
-  symbol->name = strdup (name);
+  symbol->name = glr_strdup (name);
   if (symbol->name == NULL)
     {
       free (symbol);
@@ -240,4 +264,133 @@ glr_parse_table_t *
 glr_grammar_get_parse_table (const glr_grammar_t *grammar)
 {
   return grammar != NULL ? grammar->parse_table : NULL;
+}
+
+int
+glr_grammar_find_symbol (const glr_grammar_t *grammar, const char *name,
+                         glr_symbol_type_t type)
+{
+  size_t i;
+
+  if (grammar == NULL || name == NULL)
+    {
+      return -1;
+    }
+
+  for (i = 0; i < grammar->symbol_count; i++)
+    {
+      glr_symbol_t *symbol = grammar->symbols[i];
+      if (symbol != NULL && symbol->type == type && symbol->name != NULL
+          && strcmp (symbol->name, name) == 0)
+        {
+          return symbol->id;
+        }
+    }
+
+  return -1;
+}
+
+int
+glr_grammar_find_symbol_any (const glr_grammar_t *grammar, const char *name)
+{
+  size_t i;
+
+  if (grammar == NULL || name == NULL)
+    {
+      return -1;
+    }
+
+  for (i = 0; i < grammar->symbol_count; i++)
+    {
+      glr_symbol_t *symbol = grammar->symbols[i];
+      if (symbol != NULL && symbol->name != NULL
+          && strcmp (symbol->name, name) == 0)
+        {
+          return symbol->id;
+        }
+    }
+
+  return -1;
+}
+
+static void
+glr_grammar_validation_error (char *error, size_t error_size,
+                              const char *message)
+{
+  if (error != NULL && error_size > 0)
+    {
+      snprintf (error, error_size, "%s", message);
+    }
+}
+
+bool
+glr_grammar_validate (const glr_grammar_t *grammar, char *error,
+                      size_t error_size)
+{
+  size_t i;
+  size_t k;
+
+  if (grammar == NULL)
+    {
+      glr_grammar_validation_error (error, error_size, "null grammar");
+      return false;
+    }
+
+  if (grammar->start_symbol == NULL)
+    {
+      glr_grammar_validation_error (error, error_size, "no start symbol");
+      return false;
+    }
+
+  for (i = 0; i < grammar->production_count; i++)
+    {
+      glr_production_t *production = grammar->productions[i];
+      if (production == NULL)
+        {
+          glr_grammar_validation_error (error, error_size,
+                                        "null production entry");
+          return false;
+        }
+      if (production->head == NULL
+          || !glr_symbol_is_nonterminal (production->head))
+        {
+          glr_grammar_validation_error (error, error_size,
+                                        "production head must be a "
+                                        "non-terminal");
+          return false;
+        }
+      for (k = 0; k < production->body_length; k++)
+        {
+          glr_symbol_t *body_symbol = production->body[k];
+          bool owned = false;
+          size_t s;
+          if (body_symbol == NULL)
+            {
+              glr_grammar_validation_error (error, error_size,
+                                            "null body symbol");
+              return false;
+            }
+          for (s = 0; s < grammar->symbol_count; s++)
+            {
+              if (grammar->symbols[s] == body_symbol)
+                {
+                  owned = true;
+                  break;
+                }
+            }
+          if (!owned)
+            {
+              glr_grammar_validation_error (error, error_size,
+                                            "body symbol not owned by "
+                                            "grammar");
+              return false;
+            }
+        }
+    }
+
+  if (error != NULL && error_size > 0)
+    {
+      error[0] = '\0';
+    }
+  return true;
 }

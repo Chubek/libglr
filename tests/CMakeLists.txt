@@ -34,6 +34,24 @@ glr_add_test(test_reduction SOURCES test_reduction.c LABELS "unit;core")
 glr_add_test(test_parser SOURCES test_parser.c LABELS "unit;core")
 glr_add_test(test_reader SOURCES test_reader.c LABELS "unit;core;lexer")
 glr_add_test(test_rewrite SOURCES test_rewrite.c LABELS "unit;rewrite")
+glr_add_test(test_stratified SOURCES test_stratified.c LABELS "unit;core;stratified")
+glr_add_test(test_stratified_sppf SOURCES test_stratified_sppf.c LABELS "unit;core;stratified;forest")
+glr_add_test(test_live_parsing SOURCES test_live_parsing.c LABELS "unit;core;live")
+glr_add_test(test_query SOURCES test_query.c LABELS "unit;core;query")
+
+# Stratified suite needs the same feature macros as the library so the
+# cache-backed cases compile in when the incremental cache is enabled.
+if(ENABLE_CACHE AND HAVE_LIBMDBX)
+    target_compile_definitions(test_stratified PRIVATE HAVE_LMDB=1 HAVE_LIBMDBX=1)
+    if(TARGET mdbx-static)
+        target_link_libraries(test_stratified PRIVATE mdbx-static)
+    elseif(TARGET mdbx)
+        target_link_libraries(test_stratified PRIVATE mdbx)
+    endif()
+    if(OpenSSL_FOUND)
+        target_link_libraries(test_stratified PRIVATE OpenSSL::Crypto)
+    endif()
+endif()
 glr_add_test(test_ambiguity
     SOURCES test_ambiguity.c
     LABELS "unit;integration;legacy")
@@ -57,6 +75,10 @@ add_custom_target(check
         test_parser
         test_reader
         test_rewrite
+        test_stratified
+        test_stratified_sppf
+        test_live_parsing
+        test_query
         test_ambiguity
     USES_TERMINAL)
 

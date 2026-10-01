@@ -40,7 +40,8 @@ extern "C"
   {
     glr_forest_node_type_t type; ///< Node type
     int symbol_id;               ///< Symbol ID (terminal or non-terminal)
-    size_t position;             ///< Input position
+    size_t position;             ///< Input position where the node begins
+    size_t end_position;         ///< Input position just past the node
     struct glr_forest_node **children; ///< Child nodes (for non-terminals)
     size_t child_count;                ///< Number of children
     size_t capacity;                   ///< Child capacity
@@ -74,6 +75,12 @@ extern "C"
     size_t node_count;         ///< Number of positions
     glr_forest_edge_t **edges; ///< All edges indexed by position
     size_t edge_count;         ///< Number of positions with edges
+    /**
+     * Node produced by the final reduction of an accepted parse, or NULL
+     * when the parse failed or the forest was built by hand. The node
+     * spans the whole input, so it is the entry point for tree walks.
+     */
+    glr_forest_node_t *root;
   } glr_forest_t;
 
   /**
@@ -102,6 +109,18 @@ extern "C"
   glr_forest_node_t *glr_forest_get_node (glr_forest_t *forest,
                                           glr_forest_node_type_t type,
                                           int symbol_id, size_t position);
+
+  /**
+   * @brief Destroy a single node without touching its children.
+   *
+   * The packed forest owns every node, so a node is normally released with its
+   * forest. Pruning is the exception: an incremental update invalidates a
+   * range of nodes while the rest of the forest stays valid, and the children
+   * of a pruned node are forest nodes in their own right.
+   *
+   * @param node Node to destroy (NULL is a no-op)
+   */
+  void glr_forest_node_destroy (glr_forest_node_t *node);
 
   /**
    * @brief Add a child to a non-terminal node
@@ -139,6 +158,127 @@ extern "C"
    */
   glr_forest_edge_t *glr_forest_get_edges (glr_forest_t *forest,
                                            size_t position);
+
+  /**
+   * @brief Count nodes stored at one position (sibling chain length).
+   *
+   * @param forest Forest to inspect (may be NULL)
+   * @param position Position index
+   * @return Chain length, or 0 on invalid input
+   */
+  size_t glr_forest_node_count_at (const glr_forest_t *forest,
+                                   size_t position);
+
+  /**
+   * @brief Count all nodes in a forest across every position.
+   *
+   * @param forest Forest to inspect (may be NULL)
+   * @return Total node count
+   */
+  size_t glr_forest_total_nodes (const glr_forest_t *forest);
+
+  /**
+   * @brief Deep-copy a forest.
+   *
+   * Every node object is duplicated and child pointers are remapped to
+   * the copies, so the clone can be destroyed independently of the
+   * source. Edge lists are duplicated as value copies.
+   *
+   * @param source Forest to copy (may be NULL)
+   * @return New forest, or NULL on invalid input / allocation failure
+   */
+  glr_forest_t *glr_forest_clone (const glr_forest_t *source);
+
+  /**
+   * @brief Remove all nodes and edges without destroying the container.
+   *
+   * @param forest Forest to clear (may be NULL)
+   */
+  void glr_forest_clear (glr_forest_t *forest);
+
+  /**
+   * @brief Callback invoked once per node by glr_forest_visit.
+   *
+   * @param node Node being visited
+   * @param depth Distance from the traversal root
+   * @param user_data Caller context
+   */
+  typedef void (*glr_forest_visit_fn) (glr_forest_node_t *node, size_t depth,
+                                       void *user_data);
+
+  /**
+   * @brief Walk a forest breadth-first without revisiting shared nodes.
+   *
+   * The forest is a directed acyclic graph, so a node reached through two
+   * derivations is visited once. When @p root is NULL the traversal starts
+   * at every node stored in the forest.
+   *
+   * @param forest Forest to walk (may be NULL)
+   * @param root Start node, or NULL to start from the whole forest
+   * @param visit Callback invoked per node
+   * @param user_data Context passed to @p visit
+   * @return Number of nodes visited
+   */
+  size_t glr_forest_visit (const glr_forest_t *forest,
+                           const glr_forest_node_t *root,
+                           glr_forest_visit_fn visit, void *user_data);
+
+  /**
+   * @brief Get or create a constructor node for one reduction.
+   *
+   * SPPF packing for a reduction must key on the whole span, not just the
+   * start: a left-recursive rule such as `E -> E + T` reduces twice over the
+   * same start position with different end positions, and those are two
+   * distinct derivations. Only (production, start, end) keeps them apart and
+   * guarantees a node never becomes its own descendant.
+   *
+   * @param forest Forest to update
+   * @param production_id Production that was reduced
+   * @param start Span start in the input
+   * @param end Span end in the input
+   * @return Packed node, or NULL on allocation failure
+   */
+  glr_forest_node_t *glr_forest_get_constructor (glr_forest_t *forest,
+                                                int production_id,
+                                                size_t start, size_t end);
+
+  /**
+   * @brief Get or create the symbol node for a non-terminal occurrence.
+   *
+   * The counterpart of glr_forest_get_constructor: a symbol node identifies
+   * one non-terminal over one span, and the constructor nodes packed under it
+   * are the alternative ways to derive that span. Keying on the full span
+   * matters for left recursion, where the same non-terminal occurs at the
+   * same start with different ends and those are *not* alternatives.
+   *
+   * @param forest Forest to update
+   * @param nonterminal_id Non-terminal symbol id
+   * @param start Span start in the input
+   * @param end Span end in the input
+   * @return Packed symbol node, or NULL on allocation failure
+   */
+  glr_forest_node_t *glr_forest_get_symbol (glr_forest_t *forest,
+                                            int nonterminal_id, size_t start,
+                                            size_t end);
+
+  /**
+   * @brief Report whether a forest encodes more than one derivation.
+   *
+   * The SPPF is a packed graph, not a tree: sub-parses are shared, and a
+   * left-recursive rule such as `E -> E + T` makes the graph cyclic, since
+   * the symbol node for a non-terminal occurrence links back to itself
+   * through a constructor over a longer span. That sharing is exactly what
+   * ambiguity looks like, and it is why this predicate exists instead of a
+   * derivation count: enumerating the trees of a cyclic packed forest means
+   * unrolling the cycles, which is a separate algorithm.
+   *
+   * A forest is ambiguous when some symbol node has more than one packed
+   * constructor, or when any sub-forest reachable from it is ambiguous.
+   *
+   * @param node Node to inspect (may be NULL)
+   * @return true when more than one derivation is encoded
+   */
+  bool glr_forest_is_ambiguous (const glr_forest_node_t *node);
 
   /**
    * @brief Check if a node is a terminal

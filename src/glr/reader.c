@@ -19,6 +19,29 @@ extern bool glr_lexer_hooks_dispatch (glr_lexer_hooks_t *hooks,
                                       const glr_lexer_event_t *event,
                                       glr_lexer_response_t *response);
 
+/* strdup() is not part of C11, so the reader carries its own copy helper. */
+static char *
+glr_reader_strdup (const char *text)
+{
+  size_t length;
+  char *copy;
+
+  if (text == NULL)
+    {
+      return NULL;
+    }
+
+  length = strlen (text);
+  copy = malloc (length + 1);
+  if (copy == NULL)
+    {
+      return NULL;
+    }
+
+  memcpy (copy, text, length + 1);
+  return copy;
+}
+
 static uint16_t
 read_u16 (const unsigned char *data, glr_reader_encoding_t encoding)
 {
@@ -81,7 +104,7 @@ make_fallback_name (uint32_t codepoint, char **name_out)
   unicode_name = glr_lexer_unicode_name (codepoint);
   if (unicode_name != NULL)
     {
-      *name_out = strdup (unicode_name);
+      *name_out = glr_reader_strdup (unicode_name);
       return *name_out != NULL ? GLR_READER_STATUS_OK
                                : GLR_READER_STATUS_NO_MEMORY;
     }
@@ -92,7 +115,7 @@ make_fallback_name (uint32_t codepoint, char **name_out)
       return GLR_READER_STATUS_INVALID_SEQUENCE;
     }
 
-  *name_out = strdup (buffer);
+  *name_out = glr_reader_strdup (buffer);
   return *name_out != NULL ? GLR_READER_STATUS_OK : GLR_READER_STATUS_NO_MEMORY;
 }
 
@@ -265,7 +288,7 @@ glr_reader_next (glr_reader_t *reader, glr_reader_token_t *token)
 
   if (glr_lexer_hooks_dispatch (reader->hooks, &event, &response))
     {
-      name = strdup (response.terminal_name);
+      name = glr_reader_strdup (response.terminal_name);
       if (name == NULL)
         {
           return GLR_READER_STATUS_NO_MEMORY;
@@ -317,4 +340,34 @@ glr_reader_status_string (glr_reader_status_t status)
     }
 
   return "unknown";
+}
+
+size_t
+glr_reader_get_offset (const glr_reader_t *reader)
+{
+  return reader != NULL ? reader->offset : 0;
+}
+
+size_t
+glr_reader_remaining (const glr_reader_t *reader)
+{
+  if (reader == NULL || reader->input == NULL)
+    {
+      return 0;
+    }
+  if (reader->offset >= reader->input_length)
+    {
+      return 0;
+    }
+  return reader->input_length - reader->offset;
+}
+
+bool
+glr_reader_at_eof (const glr_reader_t *reader)
+{
+  if (reader == NULL)
+    {
+      return true;
+    }
+  return reader->offset >= reader->input_length;
 }

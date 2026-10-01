@@ -1,5 +1,6 @@
 // src/glr/cache.c
 #include <glr/cache.h>
+#include <glr/dependency.h>
 #include <glr/forest.h>
 #include <glr/stack.h>
 #include <glr/grammar.h>
@@ -11,7 +12,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <time.h>
-#include <openssl/sha.h>
+#include <openssl/evp.h>
 
 /* Internal cache structure */
 struct glr_cache_t {
@@ -38,10 +39,6 @@ static uint64_t time_to_u64(time_t t) {
     return (uint64_t)t;
 }
 
-static time_t u64_to_time(uint64_t u) {
-    return (time_t)u;
-}
-
 glr_cache_t* glr_cache_open(const glr_cache_config_t* config) {
     glr_cache_t* cache = calloc(1, sizeof(glr_cache_t));
     if (!cache) return NULL;
@@ -57,7 +54,13 @@ glr_cache_t* glr_cache_open(const glr_cache_config_t* config) {
         return NULL;
     }
     
+    /* mdbx_env_set_mapsize() is the only entry point available across the
+       libmdbx releases this library supports, so silence the upstream
+       deprecation marker locally. */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     rc = mdbx_env_set_mapsize(cache->env, cache->config.map_size);
+#pragma GCC diagnostic pop
     if (rc != 0) {
         fprintf(stderr, "mdbx_env_set_mapsize: %s\n", mdbx_strerror(rc));
         mdbx_env_close(cache->env);
@@ -128,12 +131,15 @@ cleanup:
 }
 
 void glr_cache_close(glr_cache_t* cache) {
+    extern void glr_dependency_drop_cache(glr_cache_t *cache);
     if (!cache) return;
-    
+
+    glr_dependency_drop_cache(cache);
+
     if (cache->env) {
         mdbx_env_close(cache->env);
     }
-    
+
     free(cache);
 }
 
@@ -143,10 +149,30 @@ int glr_cache_sync(glr_cache_t* cache) {
 }
 
 void glr_cache_compute_hash(const uint8_t* data, size_t len, uint8_t hash[32]) {
-    SHA256_CTX ctx;
-    SHA256_Init(&ctx);
-    SHA256_Update(&ctx, data, len);
-    SHA256_Final(hash, &ctx);
+    unsigned int out_len = 0;
+    EVP_MD_CTX *ctx;
+
+    /* Use the EVP interface: the low-level SHA256_* helpers are
+       deprecated in OpenSSL 3 and removed in later releases. */
+    if (!data && len > 0) {
+        memset(hash, 0, 32);
+        return;
+    }
+
+    ctx = EVP_MD_CTX_new();
+    if (!ctx) {
+        memset(hash, 0, 32);
+        return;
+    }
+
+    if (EVP_DigestInit_ex(ctx, EVP_sha256(), NULL) != 1
+        || EVP_DigestUpdate(ctx, data, len) != 1
+        || EVP_DigestFinal_ex(ctx, hash, &out_len) != 1
+        || out_len != 32) {
+        memset(hash, 0, 32);
+    }
+
+    EVP_MD_CTX_free(ctx);
 }
 
 /* Helper: Pack a cache key into a single integer for indexing */
@@ -428,14 +454,93 @@ int glr_cache_store_subtree(glr_cache_t* cache,
 int glr_cache_invalidate_range(glr_cache_t* cache,
                                uint32_t start_byte,
                                uint32_t end_byte) {
+    glr_dependency_t *affected = NULL;
+    size_t affected_count = 0;
+    MDBX_txn *txn = NULL;
+    int rc;
+
     if (!cache) return -1;
-    
-    /* This would use the dependency tracking system */
-    /* For now, it's a stub */
-    (void)start_byte;
-    (void)end_byte;
-    
-    return 0;
+    if (start_byte >= end_byte) return -1;
+
+    /* Find every cached key whose source range overlaps the edit. */
+    if (glr_dependency_get_affected (cache, start_byte, end_byte,
+                                     &affected, &affected_count) != 0)
+      {
+        return -1;
+      }
+
+    rc = mdbx_txn_begin(cache->env, NULL, 0, &txn);
+    if (rc != 0) {
+        glr_dependency_free_list(affected);
+        return -1;
+    }
+
+    for (size_t i = 0; i < affected_count; i++)
+      {
+        MDBX_val key;
+        uint64_t packed = affected[i].cache_key;
+        MDBX_dbi dbi = 0;
+        int have_dbi = 1;
+
+        key.iov_base = &packed;
+        key.iov_len = sizeof(packed);
+
+        switch (affected[i].entry_type)
+          {
+          case GLR_CACHE_ENTRY_FOREST:
+            dbi = cache->dbi_forest;
+            break;
+          case GLR_CACHE_ENTRY_GSS_NODE:
+            dbi = cache->dbi_gss;
+            break;
+          case GLR_CACHE_ENTRY_SUBTREE:
+            dbi = cache->dbi_subtree;
+            break;
+          default:
+            have_dbi = 0;
+            break;
+          }
+
+        if (have_dbi)
+          {
+            /* Best effort: missing keys are fine, real errors abort. */
+            int del = mdbx_del (txn, dbi, &key, NULL);
+            if (del != 0 && del != MDBX_NOTFOUND)
+              {
+                mdbx_txn_abort (txn);
+                glr_dependency_free_list (affected);
+                return -1;
+              }
+            switch (affected[i].entry_type)
+              {
+              case GLR_CACHE_ENTRY_FOREST:
+                if (cache->stats.forest_count > 0)
+                  cache->stats.forest_count--;
+                break;
+              case GLR_CACHE_ENTRY_GSS_NODE:
+                if (cache->stats.gss_count > 0)
+                  cache->stats.gss_count--;
+                break;
+              case GLR_CACHE_ENTRY_SUBTREE:
+                if (cache->stats.subtree_count > 0)
+                  cache->stats.subtree_count--;
+                break;
+              default:
+                break;
+              }
+          }
+      }
+
+    rc = mdbx_txn_commit (txn);
+    glr_dependency_free_list (affected);
+    if (rc != 0)
+      {
+        return -1;
+      }
+
+    /* Drop the dependency records themselves so future edits do not see
+       stale keys. */
+    return glr_dependency_invalidate_range (cache, start_byte, end_byte);
 }
 
 int glr_cache_get_stats(glr_cache_t* cache, glr_cache_stats_t* stats) {
@@ -447,10 +552,13 @@ int glr_cache_get_stats(glr_cache_t* cache, glr_cache_stats_t* stats) {
     MDBX_stat mdbx_stat;
     mdbx_stat.ms_psize = 0;
     
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     if (mdbx_env_stat(cache->env, &mdbx_stat, sizeof(mdbx_stat)) == 0) {
         stats->cache_size_bytes = mdbx_stat.ms_psize * 
                                   (mdbx_stat.ms_leaf_pages + mdbx_stat.ms_branch_pages);
     }
+#pragma GCC diagnostic pop
     
     return 0;
 }

@@ -25,6 +25,7 @@ make_ascii_grammar (void)
   return grammar;
 }
 
+/* Start -> BANG LATIN_A, so the UTF-16 input "!" "A" is a full sentence. */
 static glr_grammar_t *
 make_utf16_grammar (void)
 {
@@ -32,7 +33,7 @@ make_utf16_grammar (void)
   int start_id;
   int bang_id;
   int letter_id;
-  glr_symbol_t *body[1];
+  glr_symbol_t *body[2];
 
   if (grammar == NULL)
     {
@@ -44,9 +45,8 @@ make_utf16_grammar (void)
   letter_id = glr_grammar_add_symbol (grammar, GLR_SYMBOL_TERMINAL,
                                       "LATIN CAPITAL LETTER A");
   body[0] = glr_grammar_get_symbol (grammar, bang_id);
-  glr_grammar_add_production (grammar, start_id, body, 1);
-  body[0] = glr_grammar_get_symbol (grammar, letter_id);
-  glr_grammar_add_production (grammar, start_id, body, 1);
+  body[1] = glr_grammar_get_symbol (grammar, letter_id);
+  glr_grammar_add_production (grammar, start_id, body, 2);
   glr_grammar_set_start_symbol (grammar, start_id);
   return grammar;
 }
@@ -85,15 +85,20 @@ GLR_TEST_CASE (test_parser_parse_ascii)
   glr_parser_t *parser = glr_parser_create (grammar);
   glr_parse_result_t result;
 
-  glr_test_begin ("parser preserves legacy byte input");
+  glr_test_begin ("parser tokenizes byte input against grammar terminals");
   GLR_TEST_ASSERT_NOT_NULL (parser, "parser should be created");
-  result = glr_parse (parser, "abc", 3);
+  result = glr_parse (parser, "a", 1);
   GLR_TEST_ASSERT_EQ (result.error, GLR_PARSE_SUCCESS,
-                      "legacy byte input should still parse");
-  GLR_TEST_ASSERT_EQ (result.position, 3,
-                      "legacy byte input should advance by bytes");
+                      "\"a\" is the grammar's only sentence");
+  GLR_TEST_ASSERT_EQ (result.position, 1,
+                      "byte input should advance past the accepted token");
   GLR_TEST_ASSERT_NULL (glr_parser_get_last_token (parser),
                         "byte-mode parsing should not expose reader tokens");
+  result = glr_parse (parser, "ab", 2);
+  GLR_TEST_ASSERT_EQ (result.error, GLR_PARSE_ERROR_SYNTAX,
+                      "'b' is not a terminal of the grammar");
+  GLR_TEST_ASSERT_NULL (result.forest,
+                        "rejected input should not expose a forest");
   glr_parser_destroy (parser);
   glr_grammar_destroy (grammar);
   glr_test_end ();
@@ -134,6 +139,41 @@ GLR_TEST_CASE (test_parser_parse_utf16_with_hook)
   glr_test_end ();
 }
 
+GLR_TEST_CASE (test_parser_last_token_survives_reset)
+{
+  static const unsigned char input[] = { 0xFF, 0xFE, 0x21, 0x00, 0x41, 0x00 };
+  glr_grammar_t *grammar = make_utf16_grammar ();
+  glr_parser_t *parser = glr_parser_create (grammar);
+  glr_lexer_hooks_t *hooks = glr_lexer_hooks_create ();
+  const glr_reader_token_t *token;
+
+  glr_test_begin ("parser keeps the last reader token after a parse");
+  GLR_TEST_ASSERT_NOT_NULL (parser, "parser should be created");
+  GLR_TEST_ASSERT_NOT_NULL (hooks, "hooks should be created");
+  glr_lexer_hooks_add (hooks, "bang", 10, bang_hook, NULL, NULL);
+  glr_parser_set_lexer_hooks (parser, hooks);
+  GLR_TEST_ASSERT_EQ (
+      glr_parse (parser, (const char *) input, sizeof (input)).error,
+      GLR_PARSE_SUCCESS, "BOM-prefixed UTF-16 input should parse");
+  token = glr_parser_get_last_token (parser);
+  GLR_TEST_ASSERT_NOT_NULL (token, "last token should be available");
+  if (token != NULL)
+    {
+      GLR_TEST_ASSERT (
+          glr_test_string_eq (token->terminal_name, "LATIN CAPITAL LETTER A"),
+          "last token should be the final reader token");
+      GLR_TEST_ASSERT_EQ (token->byte_offset, 4,
+                          "last token should skip the two-byte BOM");
+    }
+  GLR_TEST_ASSERT_EQ (glr_parser_reset (parser), 0, "reset should succeed");
+  GLR_TEST_ASSERT_NULL (glr_parser_get_last_token (parser),
+                        "reset should clear the recorded token");
+  glr_lexer_hooks_destroy (hooks);
+  glr_parser_destroy (parser);
+  glr_grammar_destroy (grammar);
+  glr_test_end ();
+}
+
 GLR_TEST_CASE (test_parser_rejects_unknown_utf16_terminal)
 {
   static const unsigned char input[] = { 0x21, 0x00 };
@@ -148,6 +188,8 @@ GLR_TEST_CASE (test_parser_rejects_unknown_utf16_terminal)
                       "unknown UTF-16 terminal should fail with syntax error");
   GLR_TEST_ASSERT_EQ (result.position, 2,
                       "error position should reflect the failing token span");
+  GLR_TEST_ASSERT_NULL (result.forest,
+                        "rejected input should not expose a forest");
   glr_parser_destroy (parser);
   glr_grammar_destroy (grammar);
   glr_test_end ();
@@ -209,6 +251,7 @@ main (void)
   test_parser_create_destroy (&stats);
   test_parser_parse_ascii (&stats);
   test_parser_parse_utf16_with_hook (&stats);
+  test_parser_last_token_survives_reset (&stats);
   test_parser_rejects_unknown_utf16_terminal (&stats);
   test_parser_misc_accessors (&stats);
   test_parser_null_contract (&stats);

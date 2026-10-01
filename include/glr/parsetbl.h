@@ -17,6 +17,7 @@
  * representations (e.g., void**) with a safe, explicit, and generator-friendly API.
  */
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -242,6 +243,67 @@ glr_parse_table_get_goto(const glr_parse_table_t *table,
                         uint32_t state,
                         uint32_t nonterminal,
                         uint32_t *out_next_state);
+
+/**
+ * @brief Count actions stored in one table cell.
+ *
+ * @param table Parse table (may be NULL)
+ * @param state State index
+ * @param terminal Terminal symbol ID
+ * @return Action count, or 0 on invalid input
+ */
+size_t
+glr_parse_table_action_count(const glr_parse_table_t *table,
+                             uint32_t state,
+                             uint32_t terminal);
+
+/**
+ * @brief Check whether a cell holds conflicting actions.
+ *
+ * A cell conflicts when it stores more than one action (shift/reduce
+ * or reduce/reduce ambiguity in GLR terms).
+ *
+ * @param table Parse table (may be NULL)
+ * @param state State index
+ * @param terminal Terminal symbol ID
+ * @return true when action count > 1
+ */
+bool
+glr_parse_table_has_conflict(const glr_parse_table_t *table,
+                             uint32_t state,
+                             uint32_t terminal);
+
+/**
+ * @brief Count all conflicts in a parse table.
+ *
+ * @param table Parse table (may be NULL)
+ * @return Number of conflicting cells
+ */
+size_t
+glr_parse_table_conflict_count(const glr_parse_table_t *table);
+
+/** @def GLR_PARSE_TABLE_MAX_STATES
+ *  @brief Upper bound on generated state count (safety valve). */
+#define GLR_PARSE_TABLE_MAX_STATES 100000u
+
+/**
+ * @brief Get the end-of-input column of a table.
+ *
+ * Tables built by glr_grammar_build_parse_table() reserve exactly one
+ * terminal column past the grammar's symbol ids. That column holds the
+ * reductions justified by FOLLOW and the single ACCEPT action, so
+ * end-of-input behaviour never collides with a real terminal.
+ *
+ * @param table Parse table (may be NULL)
+ * @return EOF column index, or 0 for a NULL/empty table
+ */
+static inline uint32_t
+glr_parse_table_eof_column(const glr_parse_table_t *table)
+{
+    return (table != NULL && table->terminal_count > 0)
+               ? (uint32_t)(table->terminal_count - 1)
+               : 0u;
+}
 
 #ifdef __cplusplus
 }

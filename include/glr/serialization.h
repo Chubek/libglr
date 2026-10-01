@@ -2,7 +2,9 @@
 #define GLR_SERIALIZATION_H
 
 #include <glr/forest.h>
+#include <glr/grammar.h>
 #include <glr/stack.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
 
@@ -132,6 +134,121 @@ int glr_serialize_forest_node(const glr_forest_node_t* node, uint8_t** out_data,
  * @return 0 on success, -1 on malformed input or allocation failure.
  */
 int glr_deserialize_forest_node(const uint8_t* data, size_t len, glr_forest_node_t** out_node);
+
+  /**
+   * @brief Kind of event reported while streaming a parse forest as XML.
+   *
+   * The stream is a document: it opens once, reports one start or leaf event
+   * per node reachable from the root in depth-first order, and closes once. A
+   * terminal is reported as a single GLR_XML_EVENT_LEAF carrying its text, so
+   * the leaf text needs no separate side channel.
+   */
+  typedef enum
+  {
+    GLR_XML_EVENT_DOCUMENT_START, /**< Emitted once before any node. */
+    GLR_XML_EVENT_NODE_START,    /**< Opening tag of a non-terminal/constructor. */
+    GLR_XML_EVENT_LEAF,          /**< Complete terminal, with @c text set. */
+    GLR_XML_EVENT_NODE_END,      /**< Closing tag matching the open element. */
+    GLR_XML_EVENT_DOCUMENT_END   /**< Emitted once after the last node. */
+  } glr_xml_event_t;
+
+  /**
+   * @brief Payload delivered with each XML event.
+   */
+  typedef struct
+  {
+    const glr_forest_node_t *node; /**< Node the event refers to; NULL for document events. */
+    const char *text;               /**< Terminal text; only set for GLR_XML_EVENT_LEAF. */
+    size_t text_length;             /**< Length of @c text in bytes. */
+    size_t depth;                   /**< Nesting depth; 0 at document events and the root. */
+  } glr_xml_event_info_t;
+
+  /**
+   * @brief Sink invoked for every XML event.
+   * @param event Kind of event.
+   * @param info Event payload; never NULL.
+   * @param user_data Caller context.
+   */
+  typedef void (*glr_xml_event_fn) (glr_xml_event_t event,
+                                    const glr_xml_event_info_t *info,
+                                    void *user_data);
+
+  /**
+   * @brief Stream a parse forest as an XML event sequence.
+   *
+   * Walks the forest rooted at @c forest->root in depth-first order and
+   * reports one event per node, so a caller can render XML, count nodes, or
+   * forward the stream over a pipe without the library materializing a
+   * document. Shared nodes are visited once.
+   *
+   * @param forest Forest to stream (NULL yields the document events only).
+   * @param grammar Grammar used to resolve symbol ids to names (may be NULL,
+   *                 in which case only ids are reported).
+   * @param input Source text the forest was built from (may be NULL, in which
+   *              case terminals report no text).
+   * @param input_length Length of @p input in bytes.
+   * @param emit Sink invoked per event (required).
+   * @param user_data Context passed to @p emit.
+   * @return Number of node events emitted, or 0 on invalid input.
+   *
+   * @see glr_forest_to_xml
+   */
+  size_t glr_forest_write_xml_events (const glr_forest_t *forest,
+                                      const glr_grammar_t *grammar,
+                                      const char *input, size_t input_length,
+                                      glr_xml_event_fn emit, void *user_data);
+
+  /**
+   * @brief Stream one subtree as an XML event sequence.
+   *
+   * The same event sequence as @ref glr_forest_write_xml_events, but rooted at
+   * a single node, so a caller can serialize the part of a forest it cares
+   * about without building a throwaway container first.
+   *
+   * @param root Node to start from (may be NULL).
+   * @param grammar Grammar used to resolve symbol names (may be NULL).
+   * @param input Source text (may be NULL).
+   * @param input_length Length of @p input in bytes.
+   * @param emit Sink invoked per event (required).
+   * @param user_data Context passed to @p emit.
+   * @return Number of node events emitted, or 0 on invalid input.
+   */
+  size_t glr_forest_node_write_xml_events (const glr_forest_node_t *root,
+                                           const glr_grammar_t *grammar,
+                                           const char *input,
+                                           size_t input_length,
+                                           glr_xml_event_fn emit,
+                                           void *user_data);
+
+  /**
+   * @brief Render a parse forest as an XML document.
+   *
+   * Produces the same event sequence as @ref glr_forest_write_xml_events as a
+   * single XML string:
+   *
+   * @code
+   * <?xml version="1.0" encoding="UTF-8"?>
+   * <parse-forest>
+   *   <node type="nonterminal" symbol="Expr" start="0" end="3">
+   *     <node type="constructor" production="1" start="0" end="3">
+   *       <leaf type="terminal" symbol="n" start="0" end="1">n</leaf>
+   *     </node>
+   *   </node>
+   * </parse-forest>
+   * @endcode
+   *
+   * @param forest Forest to render (may be NULL).
+   * @param grammar Grammar used to resolve symbol names (may be NULL).
+   * @param input Source text, used for leaf content (may be NULL).
+   * @param input_length Length of @p input in bytes.
+   * @param out Output buffer allocated by the function, NUL-terminated; the
+   *            caller frees it.
+   * @param out_length Receives the length excluding the terminator; may be NULL.
+   * @return 0 on success, -1 on invalid input or allocation failure.
+   */
+  int glr_forest_to_xml (const glr_forest_t *forest,
+                         const glr_grammar_t *grammar, const char *input,
+                         size_t input_length, char **out, size_t *out_length);
 
 #ifdef __cplusplus
 }

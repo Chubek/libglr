@@ -12,12 +12,15 @@ prefer_user_flag (const glr_disambig_context_t *context,
   return candidate->user_data == user_data;
 }
 
+/* Expr -> Term, Term -> a, with "a" as the only terminal, so the
+   grammar's language is exactly {"a"}. */
 static glr_grammar_t *
 make_grammar (void)
 {
   glr_grammar_t *grammar = glr_grammar_create ();
   int expr;
   int term;
+  int a;
   glr_symbol_t *body[1];
 
   if (grammar == NULL)
@@ -27,8 +30,11 @@ make_grammar (void)
 
   expr = glr_grammar_add_symbol (grammar, GLR_SYMBOL_NONTERMINAL, "Expr");
   term = glr_grammar_add_symbol (grammar, GLR_SYMBOL_NONTERMINAL, "Term");
+  a = glr_grammar_add_symbol (grammar, GLR_SYMBOL_TERMINAL, "a");
   body[0] = glr_grammar_get_symbol (grammar, term);
   glr_grammar_add_production (grammar, expr, body, 1);
+  body[0] = glr_grammar_get_symbol (grammar, a);
+  glr_grammar_add_production (grammar, term, body, 1);
   glr_grammar_set_start_symbol (grammar, expr);
   return grammar;
 }
@@ -84,13 +90,21 @@ GLR_TEST_CASE (test_parse_result_contract)
   glr_test_begin ("parser result contract on minimal grammar");
   GLR_TEST_ASSERT_NOT_NULL (parser, "parser should be created");
 
-  result = glr_parse (parser, "x", 1);
+  result = glr_parse (parser, "a", 1);
   GLR_TEST_ASSERT_EQ (result.error, GLR_PARSE_SUCCESS,
-                      "stub parser should report success for configured grammar");
+                      "the grammar's only sentence should parse");
   GLR_TEST_ASSERT_NOT_NULL (result.forest, "parse result should expose a forest");
   GLR_TEST_ASSERT_EQ (result.position, 1, "parse should consume the full input");
   GLR_TEST_ASSERT_EQ (glr_parser_stack_count (parser), 1,
                       "parser should leave one active stack");
+
+  {
+    glr_parse_result_t bad = glr_parse (parser, "b", 1);
+    GLR_TEST_ASSERT_EQ (bad.error, GLR_PARSE_ERROR_SYNTAX,
+                        "input outside the language should be rejected");
+    GLR_TEST_ASSERT_NULL (bad.forest,
+                          "rejected input should not expose a forest");
+  }
 
   glr_parser_destroy (parser);
   glr_grammar_destroy (grammar);

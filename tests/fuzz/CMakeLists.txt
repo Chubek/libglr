@@ -54,6 +54,7 @@ add_fuzz_target(fuzz_stack fuzz_stack.c)
 add_fuzz_target(fuzz_forest fuzz_forest.c)
 add_fuzz_target(fuzz_reader fuzz_reader.c)
 add_fuzz_target(fuzz_parser fuzz_parser.c)
+add_fuzz_target(fuzz_live_query fuzz_live_query.c)
 
 # Incremental parsing fuzzing targets (if cache enabled)
 if(ENABLE_CACHE)
@@ -146,3 +147,8 @@ else()
         DEPENDS fuzz_grammar fuzz_stack fuzz_forest fuzz_reader fuzz_parser
     )
 endif()
+
+add_custom_target(fuzz-live-query
+    COMMAND echo "To run: afl-fuzz -i corpus_live_query -o findings ./fuzz_live_query"
+    DEPENDS fuzz_live_query
+)

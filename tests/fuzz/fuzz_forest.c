@@ -1,5 +1,5 @@
 /**
- * AFL Fuzzing harness for forest operations
+ * AFL Fuzzing harness for forest operations (real libglr API).
  */
 
 #include <glr/forest.h>
@@ -8,63 +8,121 @@
 #include <string.h>
 #include <stdint.h>
 
-#define MAX_INPUT_SIZE 4096
-
-int main(int argc, char** argv) {
-    uint8_t buffer[MAX_INPUT_SIZE];
-    size_t len = 0;
-
-#ifdef __AFL_HAVE_MANUAL_CONTROL
-    __AFL_INIT();
+#ifndef __AFL_LOOP
+#define __AFL_LOOP(n) (0)
 #endif
 
-    while (__AFL_LOOP(1000)) {
-        len = fread(buffer, 1, MAX_INPUT_SIZE, stdin);
-        if (len == 0) continue;
+#define MAX_INPUT_SIZE 4096
 
-        glr_forest_t* forest = glr_forest_create();
-        if (!forest) continue;
+static void
+run_once (const uint8_t *buffer, size_t len)
+{
+  glr_forest_t *forest;
+  size_t pos = 0;
 
-        glr_forest_node_t* nodes[256] = {NULL};
-        size_t node_count = 0;
-
-        size_t pos = 0;
-        while (pos + 4 < len && node_count < 256) {
-            uint8_t op = buffer[pos++];
-            uint32_t symbol_id = buffer[pos++];
-            uint32_t start = (buffer[pos] << 8) | buffer[pos+1];
-            pos += 2;
-            uint32_t end = start + (buffer[pos++] % 100);
-
-            if (op % 2 == 0) {
-                char text[64];
-                size_t text_len = (pos < len) ? (buffer[pos++] % 63) : 0;
-                if (pos + text_len <= len) {
-                    memcpy(text, buffer + pos, text_len);
-                    text[text_len] = '\0';
-                    pos += text_len;
-                    
-                    nodes[node_count++] = glr_forest_add_terminal(
-                        forest, symbol_id, start, end, text);
-                }
-            } else {
-                uint8_t child_count = (pos < len) ? (buffer[pos++] % 5) : 0;
-                glr_forest_node_t* children[5];
-                
-                for (int i = 0; i < child_count; i++) {
-                    uint8_t child_idx = (pos < len) ? buffer[pos++] : 0;
-                    children[i] = (child_idx < node_count) ? nodes[child_idx] : NULL;
-                }
-                
-                if (child_count > 0 && children[0] != NULL) {
-                    nodes[node_count++] = glr_forest_add_nonterminal(
-                        forest, symbol_id, start, end, children, child_count);
-                }
-            }
-        }
-
-        glr_forest_destroy(forest);
+  if (len < 4)
+    {
+      return;
     }
 
-    return 0;
+  forest = glr_forest_create ();
+  if (!forest)
+    {
+      return;
+    }
+
+  while (pos + 4 < len)
+    {
+      uint8_t op = buffer[pos++];
+      int symbol_id = (int) (buffer[pos++] % 16);
+      uint32_t at = (uint32_t) ((buffer[pos] << 8) | buffer[pos + 1]);
+      pos += 2;
+
+      switch (op % 5)
+        {
+        case 0:
+        case 1:
+          {
+            glr_forest_node_type_t type
+                = (op % 2 == 0) ? GLR_NODE_TERMINAL : GLR_NODE_NONTERMINAL;
+            glr_forest_node_t *node
+                = glr_forest_get_node (forest, type, symbol_id,
+                                       (size_t) (at % 64));
+            if (node != NULL && type == GLR_NODE_NONTERMINAL && pos < len)
+              {
+                glr_forest_node_t *child = glr_forest_get_node (
+                    forest, GLR_NODE_TERMINAL, (int) (buffer[pos++] % 16),
+                    (size_t) (at % 64));
+                if (child != NULL)
+                  {
+                    (void) glr_forest_add_child (node, child);
+                  }
+              }
+            break;
+          }
+        case 2:
+          {
+            glr_forest_edge_t edge;
+            memset (&edge, 0, sizeof (edge));
+            edge.nonterminal_id = symbol_id;
+            edge.start_position = (size_t) (at % 64);
+            edge.end_position = edge.start_position + (buffer[pos++] % 8);
+            (void) glr_forest_add_edge (forest, &edge);
+            break;
+          }
+        case 3:
+          {
+            glr_forest_t *clone = glr_forest_clone (forest);
+            if (clone != NULL)
+              {
+                (void) glr_forest_total_nodes (clone);
+                glr_forest_destroy (clone);
+              }
+            break;
+          }
+        case 4:
+          (void) glr_forest_node_count_at (forest, (size_t) (at % 64));
+          glr_forest_get_edges (forest, (size_t) (at % 64));
+          break;
+        }
+    }
+
+  glr_forest_destroy (forest);
+}
+
+int
+main (int argc, char **argv)
+{
+  uint8_t buffer[MAX_INPUT_SIZE];
+  size_t len = 0;
+
+  while (__AFL_LOOP (1000))
+    {
+      len = fread (buffer, 1, MAX_INPUT_SIZE, stdin);
+      if (len == 0)
+        {
+          continue;
+        }
+      run_once (buffer, len);
+    }
+
+  if (argc > 1)
+    {
+      FILE *f = fopen (argv[1], "rb");
+      if (!f)
+        {
+          return 1;
+        }
+      len = fread (buffer, 1, MAX_INPUT_SIZE, f);
+      fclose (f);
+      run_once (buffer, len);
+      return 0;
+    }
+
+  {
+    const uint8_t seed[] = "hello world fuzz seed";
+    run_once (seed, sizeof (seed) - 1);
+  }
+
+  return 0;
 }

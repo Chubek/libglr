@@ -66,6 +66,26 @@ extern "C"
   } glr_parse_result_t;
 
   /**
+   * @brief Sink for parse snapshots.
+   *
+   * Invoked once per input position while a parse is running, with the parse
+   * stack that reaches that position. A snapshot is the whole configuration,
+   * not just the top of it: an LR reduction pops as many entries as its
+   * production is long and reads the state below them, so resuming from a
+   * single entry would silently lose the rest of the stack.
+   *
+   * The stack is owned by the parser and valid only for the duration of the
+   * callback, so a sink that wants to keep one must copy it with
+   * glr_stack_copy().
+   *
+   * @param stack Parse stack at @p position; never NULL.
+   * @param position Input byte offset the stack has consumed.
+   * @param user_data Caller context.
+   */
+  typedef void (*glr_parser_snapshot_fn) (glr_stack_t *stack, size_t position,
+                                          void *user_data);
+
+  /**
    * @struct glr_parser_t
    * @brief Main GLR parser instance
    *
@@ -86,6 +106,12 @@ extern "C"
     glr_stack_t **stacks;                ///< Array of active parse stacks (GSS)
     size_t stack_count;                  ///< Number of currently active stacks
     size_t stack_capacity;               ///< Allocated capacity for stacks array
+    /**
+     * Parallel to @ref stacks. A set flag marks a stack that already holds
+     * the "shift without reducing" alternative of a shift/reduce conflict,
+     * so the reduce pass leaves it alone and the shift pass picks it up.
+     */
+    bool *stack_skip_reduce;
     glr_forest_t *forest;                ///< Shared Packed Parse Forest (SPPF)
     void **state_table;                  ///< LR state transition table
     size_t state_table_size;             ///< Number of states in table
@@ -98,8 +124,13 @@ extern "C"
     glr_reader_t *reader;                ///< Token reader for UTF-16 input
     glr_lexer_hooks_t *lexer_hooks;      ///< Custom lexer hooks (optional)
     glr_reader_token_t lookahead;        ///< Current lookahead token
+    glr_reader_token_t last_token;       ///< Most recent accepted token
     glr_parse_error_t error;             ///< Most recent error code
     void *user_data;                     ///< User-provided context pointer
+    struct glr_cache_t *cache;           ///< Incremental cache (NULL = off)
+    char *trivia;                        ///< Literal skipped between tokens
+    glr_parser_snapshot_fn snapshot_hook; ///< Optional per-position snapshot sink */
+    void *snapshot_data;                  ///< Context passed to the snapshot sink */
   };
 
   /* ========================================================================
@@ -181,6 +212,78 @@ extern "C"
                                 size_t length);
 
   /* ========================================================================
+   * Resumable parsing
+   * ======================================================================== */
+
+  /**
+   * @brief Take the parser's current forest, leaving it with an empty one.
+   *
+   * Ownership moves to the caller. Any snapshot taken during the parse refers
+   * to nodes inside this forest, so a caller that keeps snapshots has to keep
+   * the forest they came from as well; taking it over is what makes that
+   * possible.
+   *
+   * @param parser Parser instance (required).
+   * @return The forest, now owned by the caller; never NULL.
+   */
+  glr_forest_t *glr_parser_take_forest (glr_parser_t *parser);
+
+  /**
+   * @brief Install a sink that receives a snapshot at every position.
+   *
+   * Snapshots are what make an edit cheap: the parse of a prefix does not
+   * depend on what follows it, so after an edit the parser can resume from
+   * the last snapshot the edit did not touch instead of starting over.
+   *
+   * @param parser Parser instance (required).
+   * @param snapshot Sink to invoke, or NULL to stop snapshotting.
+   * @param user_data Context passed to @p snapshot.
+   * @return 0 on success, -1 on invalid input.
+   */
+  int glr_parser_set_snapshot_hook (glr_parser_t *parser,
+                                    glr_parser_snapshot_fn snapshot,
+                                    void *user_data);
+
+  /**
+   * @brief Continue a parse from a saved snapshot over new input.
+   *
+   * Resumes with @p entry as the initial stack, continues from @p position
+   * into @p input, and packs everything it builds into @p forest. This is the
+   * incremental counterpart of glr_parse(): the caller supplies the state and
+   * the forest, so the prefix described by @p entry is neither re-parsed nor
+   * re-allocated.
+   *
+   * The stack is copied in, so the caller's snapshot stays valid and can be
+   * resumed from again after a further edit.
+   *
+   * @param parser Initialized parser instance (required).
+   * @param stack Snapshot to resume from; must have been produced by the
+   *              snapshot hook of this parser (required).
+   * @param forest Forest to pack into; required and owned by the caller. It
+   *               must already contain the nodes the snapshot's entries pack,
+   *               since those pointers are shared, not remapped.
+   * @param position Offset into @p input where @p stack applies.
+   * @param input Input buffer covering the whole document, so that positions
+   *              recorded in @p forest stay comparable with it.
+   * @param length Length of @p input in bytes.
+   * @param out_result Receives the parse result; may be NULL.
+   * @return 0 when the parse accepted, -1 on failure.
+   *
+   * @note A snapshot is only valid for the text that preceded it. Resuming
+   *       from a position the caller has since edited yields whatever the
+   *       automaton makes of the new text, which is exactly the recomputation
+   *       the caller wanted to avoid; the session layer in live-parsing.h
+   *       picks the snapshot it knows is still valid and drops the nodes the
+   *       edit invalidated before handing the forest over.
+   *
+   * @see glr_parser_set_snapshot_hook
+   */
+  int glr_parser_parse_from (glr_parser_t *parser, const glr_stack_t *stack,
+                             glr_forest_t *forest, size_t position,
+                             const char *input, size_t length,
+                             glr_parse_result_t *out_result);
+
+  /* ========================================================================
    * Lexer Configuration
    * ======================================================================== */
 
@@ -240,6 +343,33 @@ extern "C"
   /* ========================================================================
    * Parser State Inspection
    * ======================================================================== */
+
+  /**
+   * @brief Configure a literal that the tokenizer skips between tokens.
+   *
+   * The parser tokenizes byte input by matching the grammar's own terminal
+   * names against the cursor (longest match wins). Trivia is the exception:
+   * any run of the configured literal is discarded before the next terminal
+   * is looked up, which is how languages express optional whitespace or
+   * comment delimiters without making the grammar ambiguous.
+   *
+   * @param parser Parser instance
+   * @param trivia Literal to skip, or NULL to disable skipping
+   * @return 0 on success, -1 on invalid input or allocation failure
+   *
+   * @note The literal must be non-empty and must not also be a terminal the
+   *       parser needs to match.
+   * @see glr_parser_get_trivia
+   */
+  int glr_parser_set_trivia (glr_parser_t *parser, const char *trivia);
+
+  /**
+   * @brief Get the trivia literal currently skipped by the tokenizer.
+   *
+   * @param parser Parser instance
+   * @return Owned literal owned by the parser, or NULL when disabled
+   */
+  const char *glr_parser_get_trivia (const glr_parser_t *parser);
 
   /**
    * @brief Get the most recent token read by the parser

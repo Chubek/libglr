@@ -143,6 +143,7 @@ DerivedData/
 coverage/
 lcov.info
 *.coverage
+Testing/
 
 ############################
 # LaTeX (Comprehensive)

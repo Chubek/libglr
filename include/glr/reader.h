@@ -156,6 +156,27 @@ extern "C"
    */
   const char *glr_reader_status_string (glr_reader_status_t status);
 
+  /**
+   * @brief Get the current byte offset of the reader cursor.
+   * @param reader Reader to query (may be NULL).
+   * @return Cursor offset in bytes, or 0 for NULL.
+   */
+  size_t glr_reader_get_offset (const glr_reader_t *reader);
+
+  /**
+   * @brief Get the number of unread bytes remaining.
+   * @param reader Reader to query (may be NULL).
+   * @return Remaining bytes, or 0 for NULL / exhausted input.
+   */
+  size_t glr_reader_remaining (const glr_reader_t *reader);
+
+  /**
+   * @brief Check whether the cursor reached the end of input.
+   * @param reader Reader to query (may be NULL).
+   * @return true at EOF (NULL counts as EOF).
+   */
+  bool glr_reader_at_eof (const glr_reader_t *reader);
+
 #ifdef __cplusplus
 }
 #endif

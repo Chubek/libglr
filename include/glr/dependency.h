@@ -84,6 +84,14 @@ int glr_dependency_get_affected(glr_cache_t* cache,
  */
 void glr_dependency_free_list(glr_dependency_t* deps);
 
+/**
+ * Count dependency records tracked for a cache handle.
+ *
+ * @param cache Cache handle (may be NULL)
+ * @return Number of tracked records, or 0 for NULL
+ */
+size_t glr_dependency_count(const glr_cache_t* cache);
+
 #ifdef __cplusplus
 }
 #endif

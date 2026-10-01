@@ -178,9 +178,34 @@ extern "C"
   /**
    * @ingroup disambiguation_api
    * @brief Return the last surviving candidate index, if unique.
+   *
+   * Scans the full candidate array and returns the highest surviving
+   * index, or SIZE_MAX when every candidate was rejected.
    */
   size_t glr_disambig_context_last_active (
       const glr_disambig_context_t *context);
+
+  /**
+   * @ingroup disambiguation_api
+   * @brief Return the first surviving candidate index.
+   */
+  size_t glr_disambig_context_first_active (
+      const glr_disambig_context_t *context);
+
+  /**
+   * @ingroup disambiguation_api
+   * @brief Count hooks registered on a parser.
+   */
+  size_t glr_parser_disambiguator_count (const glr_parser_t *parser);
+
+  /**
+   * @ingroup disambiguation_api
+   * @brief Remove one hook by name and destroy it.
+   *
+   * @return 0 when a hook was removed, -1 when no hook matches.
+   */
+  int glr_parser_remove_disambiguator (glr_parser_t *parser,
+                                       const char *name);
 
   /**
    * @ingroup disambiguation_api

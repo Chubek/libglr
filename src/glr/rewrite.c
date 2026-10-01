@@ -2034,10 +2034,40 @@ glr_rewrite_make_lr_compatible (glr_grammar_t *grammar)
 glr_rewrite_status_t
 glr_rewrite_eliminate_ambiguity (glr_grammar_t *grammar)
 {
-  glr_rewrite_status_t status = glr_rewrite_make_lr_compatible (grammar);
+  glr_rewrite_status_t status;
+  glr_parse_table_t *table;
+  char error[128];
+  size_t conflicts;
+
+  if (grammar == NULL)
+    {
+      return GLR_REWRITE_STATUS_INVALID_ARGUMENT;
+    }
+
+  status = glr_rewrite_make_lr_compatible (grammar);
   if (status != GLR_REWRITE_STATUS_OK)
     {
       return status;
     }
-  return glr_rewrite_remove_useless_symbols (grammar);
+  status = glr_rewrite_remove_useless_symbols (grammar);
+  if (status != GLR_REWRITE_STATUS_OK)
+    {
+      return status;
+    }
+
+  /* Verify the result instead of assuming it. Normalization removes the
+     conflicts it can; a grammar that is ambiguous by construction (the
+     classic E -> E + E | E * E | n) survives, and reporting that is far more
+     useful than returning success for a pass that changed nothing. */
+  memset (error, 0, sizeof (error));
+  table = glr_grammar_build_parse_table (grammar, error, sizeof (error));
+  if (table == NULL)
+    {
+      return GLR_REWRITE_STATUS_CONFLICT;
+    }
+  conflicts = glr_parse_table_conflict_count (table);
+  glr_parse_table_destroy (table);
+
+  return conflicts == 0 ? GLR_REWRITE_STATUS_OK
+                        : GLR_REWRITE_STATUS_CONFLICT;
 }

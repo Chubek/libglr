@@ -157,6 +157,53 @@ extern "C"
     return node != NULL ? node->edge_in_count : 0;
   }
 
+  /**
+   * @brief Get the number of nodes in a graph (null-safe).
+   */
+  static inline size_t
+  glr_graph_node_count (const glr_graph_t *graph)
+  {
+    return graph != NULL ? graph->node_count : 0;
+  }
+
+  /**
+   * @brief Get the number of edges in a graph (null-safe).
+   */
+  static inline size_t
+  glr_graph_edge_count (const glr_graph_t *graph)
+  {
+    return graph != NULL ? graph->edge_count : 0;
+  }
+
+  /**
+   * @brief Check whether an edge exists between two nodes.
+   *
+   * @param graph Graph to inspect (may be NULL)
+   * @param from_id Source node id
+   * @param to_id Target node id
+   * @return true when at least one matching edge exists
+   */
+  bool glr_graph_has_edge (const glr_graph_t *graph, size_t from_id,
+                           size_t to_id);
+
+  /**
+   * @brief Remove all edges between two nodes.
+   *
+   * @param graph Graph to update (may be NULL)
+   * @param from_id Source node id
+   * @param to_id Target node id
+   * @return Number of removed edges, or -1 on invalid input
+   */
+  int glr_graph_remove_edge (glr_graph_t *graph, size_t from_id,
+                             size_t to_id);
+
+  /**
+   * @brief Remove all nodes and edges without destroying the container.
+   *
+   * @param graph Graph to clear (may be NULL)
+   */
+  void glr_graph_clear (glr_graph_t *graph);
+
 #ifdef __cplusplus
 }
 #endif

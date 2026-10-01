@@ -32,8 +32,46 @@ glr_item_set_destroy (glr_item_set_t *set)
       return;
     }
 
+  for (size_t i = 0; i < set->item_count; i++)
+    {
+      free (set->items[i]);
+    }
   free (set->items);
   free (set);
+}
+
+void
+glr_item_set_clear (glr_item_set_t *set)
+{
+  size_t i;
+
+  if (set == NULL)
+    {
+      return;
+    }
+
+  for (i = 0; i < set->item_count; i++)
+    {
+      free (set->items[i]);
+      set->items[i] = NULL;
+    }
+  set->item_count = 0;
+}
+
+size_t
+glr_item_set_size (const glr_item_set_t *set)
+{
+  return set != NULL ? set->item_count : 0;
+}
+
+const glr_item_t *
+glr_item_set_get (const glr_item_set_t *set, size_t index)
+{
+  if (set == NULL || index >= set->item_count)
+    {
+      return NULL;
+    }
+  return set->items[index];
 }
 
 int

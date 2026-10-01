@@ -5,6 +5,29 @@
 
 #include "../../third_party/unicode_names/unicode_names.h"
 
+/* strdup() is not part of C11, so the library carries its own copy helper. */
+static char *
+glr_lexer_strdup (const char *text)
+{
+  size_t length;
+  char *copy;
+
+  if (text == NULL)
+    {
+      return NULL;
+    }
+
+  length = strlen (text);
+  copy = malloc (length + 1);
+  if (copy == NULL)
+    {
+      return NULL;
+    }
+
+  memcpy (copy, text, length + 1);
+  return copy;
+}
+
 typedef struct glr_lexer_hook_entry
 {
   char *name;
@@ -97,7 +120,7 @@ glr_lexer_hooks_add (glr_lexer_hooks_t *hooks, const char *name, int priority,
 
   if (name != NULL)
     {
-      entry->name = strdup (name);
+      entry->name = glr_lexer_strdup (name);
       if (entry->name == NULL)
         {
           free (entry);
@@ -134,6 +157,66 @@ void *
 glr_lexer_hooks_get_user_data (glr_lexer_hooks_t *hooks)
 {
   return hooks != NULL ? hooks->user_data : NULL;
+}
+
+size_t
+glr_lexer_hooks_count (const glr_lexer_hooks_t *hooks)
+{
+  const glr_lexer_hook_entry_t *entry;
+  size_t count = 0;
+
+  if (hooks == NULL)
+    {
+      return 0;
+    }
+
+  for (entry = hooks->head; entry != NULL; entry = entry->next)
+    {
+      count++;
+    }
+
+  return count;
+}
+
+int
+glr_lexer_hooks_remove (glr_lexer_hooks_t *hooks, const char *name)
+{
+  glr_lexer_hook_entry_t **slot;
+
+  if (hooks == NULL)
+    {
+      return -1;
+    }
+
+  for (slot = &hooks->head; *slot != NULL; slot = &(*slot)->next)
+    {
+      const char *entry_name = (*slot)->name;
+      bool match;
+
+      if (name == NULL)
+        {
+          match = entry_name == NULL;
+        }
+      else if (entry_name == NULL)
+        {
+          match = false;
+        }
+      else
+        {
+          match = strcmp (entry_name, name) == 0;
+        }
+
+      if (match)
+        {
+          glr_lexer_hook_entry_t *victim = *slot;
+          *slot = victim->next;
+          victim->next = NULL;
+          free_entry (victim);
+          return 0;
+        }
+    }
+
+  return -1;
 }
 
 const char *
