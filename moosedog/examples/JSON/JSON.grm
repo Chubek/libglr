@@ -1,4 +1,4 @@
-Metadata 
+Entrypoint 
 {
    LanguageInfo
    {
@@ -78,6 +78,15 @@ Metadata
          *  Define = "X" sets the preprocessor symbol X, which the    *
          *  CompilePipeline @ifdef/@ifndef guards already reference.   *
          * ---------------------------------------------------------- */
+
+        Option("--alt-preprocessor")
+	{
+	    Short       = "-H"
+	    Define      = "JSON_PREPROCESSOR"
+	    Type        = String
+	    Default     = "${MOOSEDOG_SPEC_DIR}/JSON.gpp"
+	    Description = "Alternative preprocessor"
+	}
 
         Option("--no-rewrite")
         {
@@ -166,27 +175,17 @@ Metadata
             Description = "Directory where generated .parser.* and .ast.* files are written."
         }
    }
+   
 
-
-
-   CompilePipeline =
-   {
-        GPPExec("Support.gpp", __FILE__, "JSON.grm.i"),
-
-	MoosedogExec("JSON.grm.i", "JSON.parser.*", "JSON.ast.*"),
-
-	@ifndef JSON_PARSER_NO_REWRITE
-		ApplyRewrites()
-	@endif
-	
-	@ifdef JSON_PARSER_EMIT_MAKEFILE
-		MoosedogEmitMakefile(__MAKEFILE__),
-	@endif
-
-	@ifdef JSON_PARSER_EMIT_CMAKEFILE
-		MoosedogEmitCMakeFile(__CMAKEFILE__),
-	@endif
-   }
+   @ifndef JSON_PARSER_NO_ACTION
+	   Preprocess()
+	   Rewrite()
+	   CompileAST()
+	   CompileLexer()
+	   CompileParser()
+	   WriteFiles()
+	   RunUnitTests()
+   @endif
 }
 
 
