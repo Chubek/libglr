@@ -20,6 +20,8 @@ option(BUILD_SHAREDLIB "Build libglr as a shared library" OFF)
 option(INSTALL_LOCAL "Install libglr into ~/.local instead of /usr/local" OFF)
 option(ENABLE_CACHE "Enable libmdbx-based incremental parsing cache" ON)
 option(INSTALL_GLRpp "Enable installation of GLRpp" ON)
+option(GLR_LEXER_USE_PCRE2 "Build lexer-prec2 against vendored PCRE2" OFF)
+option(GLR_LEXER_USE_CHOMSKY3 "Build lexer-libchomsky3 against vendored libchomsky3" OFF)
 
 set(HAVE_LMDB 0)
 set(HAVE_LIBMDBX 0)
@@ -111,6 +113,9 @@ set(GLR_SOURCES
     src/glr/lrtable.c
     src/glr/disambiguate.c
     src/glr/lexer-hooks.c
+    src/glr/lexer-re2.c
+    src/glr/lexer-prec2.c
+    src/glr/lexer-libchomsky3.c
     src/glr/reader.c
     src/glr/rewrite.c
     src/glr/diff.c
@@ -170,6 +175,36 @@ target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ctl
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ctl/ctl)
 target_link_libraries(${PROJECT_NAME} PUBLIC sfsexp Threads::Threads)
+
+# Optional third-party regex backends for the lexer adapters. The adapters
+# always build (POSIX fallback); these options enable the real engines.
+if(GLR_LEXER_USE_PCRE2)
+    set(PCRE2_BUILD_PCRE2_16 OFF CACHE BOOL "" FORCE)
+    set(PCRE2_BUILD_PCRE2_32 OFF CACHE BOOL "" FORCE)
+    set(PCRE2_BUILD_PCRE2GREP OFF CACHE BOOL "" FORCE)
+    set(PCRE2_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    add_subdirectory(third_party/PCRE2 EXCLUDE_FROM_ALL)
+    if(TARGET pcre2-8-static)
+        target_link_libraries(${PROJECT_NAME} PRIVATE pcre2-8-static)
+    elseif(TARGET pcre2-8)
+        target_link_libraries(${PROJECT_NAME} PRIVATE pcre2-8)
+    endif()
+    target_compile_definitions(${PROJECT_NAME} PRIVATE GLR_LEXER_USE_PCRE2=1)
+endif()
+if(GLR_LEXER_USE_CHOMSKY3)
+    set(CHOMSKY3_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(CHOMSKY3_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    add_subdirectory(third_party/libchomsky3 EXCLUDE_FROM_ALL)
+    if(TARGET chomsky3)
+        target_link_libraries(${PROJECT_NAME} PRIVATE chomsky3)
+        target_include_directories(${PROJECT_NAME} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/third_party/libchomsky3/include)
+        target_compile_definitions(${PROJECT_NAME} PRIVATE GLR_LEXER_USE_CHOMSKY3=1)
+    endif()
+endif()
+# RE2 is C++ (third_party/re2); lexer-re2 stays C11/POSIX here. To link the
+# real engine, compile the optional C++ shim with
+# -DGLR_LEXER_RE2_USE_CXX and link re2 from third_party/re2.
 
 if(ENABLE_TEST_SANITIZERS)
     target_compile_options(${PROJECT_NAME} PRIVATE
@@ -244,6 +279,9 @@ install(FILES
     include/glr/parser.h
     include/glr/disambiguate.h
     include/glr/lexer-hooks.h
+    include/glr/lexer-re2.h
+    include/glr/lexer-prec2.h
+    include/glr/lexer-libchomsky3.h
     include/glr/parsetbl.h
     include/glr/reader.h
     include/glr/rewrite.h

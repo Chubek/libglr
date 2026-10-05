@@ -1,0 +1,5 @@
+JGRM = elkg.grammar.new "JSON"
+{  
+  uses = {elkg.patterns.cstring, elkg.patterns.number},
+  lexer = elkg.lexer.pcre2,
+}
