@@ -1,0 +1,243 @@
+/* ====================================================================== *
+ *  Support.gpp — GPP Preprocessing Support for JSON Grammar              *
+ *                                                                        *
+ *  Authors: Chubak Bidpaa <chubakbidpaa@riseup.net>                    *
+ *           Sami Dena <sami.dena1993@gmail.com>                         *
+ *                                                                        *
+ *  License: MIT                                                          *
+ *  Revision: v1.0.0-2026/10/05                                          *
+ * ====================================================================== */
+
+/* ---------------------------------------------------------------------- *
+ *  Mode Configuration — ensure GPP operates in the correct mode.         *
+ * ---------------------------------------------------------------------- */
+#mode standard C
+
+/* ---------------------------------------------------------------------- *
+ *  Utility Macros — general-purpose helpers.                             *
+ * ---------------------------------------------------------------------- */
+
+/* Concatenate two tokens without intermediate whitespace. */
+#define CONCAT(a, b) a##b
+
+/* Stringify a token. */
+#define STRINGIFY(x) #x
+
+/* Conditional expansion — evaluates to `then_val` if condition is true. */
+#define IF(cond, then_val) #ifdef cond then_val #endif
+
+/* Conditional expansion with else branch. */
+#define IFELSE(cond, then_val, else_val) \
+    #ifdef cond \
+        then_val \
+    #else \
+        else_val \
+    #endif
+
+/* ---------------------------------------------------------------------- *
+ *  AST Node Macros — simplify repetitive AST definitions.                *
+ * ---------------------------------------------------------------------- */
+
+/* Define a leaf node with a single typed field. */
+#define LEAF_NODE(NodeName, CType, FieldName) \
+    Node(NodeName) \
+    { \
+        Tag    = STRINGIFY(CONCAT(NodeName, _t)) \
+        Kind   = Leaf \
+        Fields = \
+        { \
+            Field(FieldName) { Type = STRINGIFY(CType), Arity = One } \
+        } \
+    }
+
+/* Define an empty leaf node (e.g., null tokens). */
+#define EMPTY_LEAF_NODE(NodeName) \
+    Node(NodeName) \
+    { \
+        Tag    = STRINGIFY(CONCAT(NodeName, _t)) \
+        Kind   = Leaf \
+        Fields = {} \
+    }
+
+/* Define a struct node with a single list field. */
+#define LIST_NODE(NodeName, ElementType, FieldName) \
+    Node(NodeName) \
+    { \
+        Tag    = STRINGIFY(CONCAT(NodeName, _t)) \
+        Kind   = Struct \
+        Fields = \
+        { \
+            Field(FieldName) { Type = STRINGIFY(CONCAT(ElementType, *)), Arity = Many } \
+        } \
+    }
+
+/* Define a binary struct node (two children). */
+#define BINARY_NODE(NodeName, LeftType, RightType, LeftField, RightField) \
+    Node(NodeName) \
+    { \
+        Tag    = STRINGIFY(CONCAT(NodeName, _t)) \
+        Kind   = Struct \
+        Fields = \
+        { \
+            Field(LeftField)  { Type = STRINGIFY(CONCAT(LeftType, *)),  Arity = One } \
+            Field(RightField) { Type = STRINGIFY(CONCAT(RightType, *)), Arity = One } \
+        } \
+    }
+
+/* ---------------------------------------------------------------------- *
+ *  Token Definition Macros — reduce boilerplate in lexical rules.        *
+ * ---------------------------------------------------------------------- */
+
+/* Define a literal keyword token. */
+#define KEYWORD_TOKEN(TokenName, Keyword) \
+    Token(TokenName) \
+    { \
+        Pattern = STRINGIFY(Keyword) \
+        Literal = Yes \
+    }
+
+/* Define a single-character punctuation token. */
+#define PUNCT_TOKEN(TokenName, Char) \
+    Token(TokenName) \
+    { \
+        Pattern = STRINGIFY(Char) \
+        Literal = Yes \
+    }
+
+/* Define a pattern-based token (not a literal). */
+#define PATTERN_TOKEN(TokenName, Regex) \
+    Token(TokenName) \
+    { \
+        Pattern = STRINGIFY(Regex) \
+        Literal = No \
+    }
+
+/* ---------------------------------------------------------------------- *
+ *  Syntactic Rule Macros — streamline grammar rule definitions.          *
+ * ---------------------------------------------------------------------- */
+
+/* Single-alternative rule returning a node. */
+#define SIMPLE_RULE(RuleName, ReturnType, Sequence, ActionCode) \
+    Rule(RuleName) -> ReturnType \
+    { \
+        Alt { Seq = STRINGIFY(Sequence)  Action = STRINGIFY(ActionCode) } \
+    }
+
+/* Empty production (epsilon rule). */
+#define EPSILON_RULE(RuleName, ReturnType, EmptyAction) \
+    Rule(RuleName) -> ReturnType \
+    { \
+        Alt { Seq = ""  Action = STRINGIFY(EmptyAction) } \
+    }
+
+/* Left-recursive list rule (base case + recursive case). */
+#define LIST_RULE(RuleName, ElementRule, Separator, ElementType) \
+    Rule(RuleName) -> CONCAT(ElementType, *) \
+    { \
+        Alt \
+        { \
+            Seq    = STRINGIFY(ElementRule) \
+            Action = "MakeList($1)" \
+        } \
+        Alt \
+        { \
+            Seq    = STRINGIFY(RuleName Separator ElementRule) \
+            Action = "AppendList($1, $3)" \
+        } \
+    }
+
+/* ---------------------------------------------------------------------- *
+ *  Semantic Action Helpers — common action patterns.                     *
+ * ---------------------------------------------------------------------- */
+
+/* Create a variant node from a child. */
+#define MAKE_VARIANT(VariantTag, ChildIndex) \
+    MakeVariant(VariantTag, $##ChildIndex)
+
+/* Create a leaf node with a token's lexeme. */
+#define MAKE_LEAF(LeafTag, TokenIndex) \
+    MakeLeaf(LeafTag, $##TokenIndex)
+
+/* Create a struct node with N children. */
+#define MAKE_NODE_1(NodeTag, Child1) \
+    MakeNode(NodeTag, $##Child1)
+
+#define MAKE_NODE_2(NodeTag, Child1, Child2) \
+    MakeNode(NodeTag, $##Child1, $##Child2)
+
+#define MAKE_NODE_3(NodeTag, Child1, Child2, Child3) \
+    MakeNode(NodeTag, $##Child1, $##Child2, $##Child3)
+
+/* ---------------------------------------------------------------------- *
+ *  Configuration Guards — for optional pipeline stages.                  *
+ * ---------------------------------------------------------------------- */
+
+/* Check whether rewriting is enabled. */
+#ifndef JSON_PARSER_NO_REWRITE
+    #define REWRITING_ENABLED 1
+#else
+    #define REWRITING_ENABLED 0
+#endif
+
+/* Check whether Makefile emission is requested. */
+#ifdef JSON_PARSER_EMIT_MAKEFILE
+    #define EMIT_MAKEFILE 1
+#else
+    #define EMIT_MAKEFILE 0
+#endif
+
+/* Check whether CMakeLists emission is requested. */
+#ifdef JSON_PARSER_EMIT_CMAKEFILE
+    #define EMIT_CMAKEFILE 1
+#else
+    #define EMIT_CMAKEFILE 0
+#endif
+
+/* ---------------------------------------------------------------------- *
+ *  Debugging Macros — conditional compilation for development.           *
+ * ---------------------------------------------------------------------- */
+
+/* Emit debug annotations when JSON_PARSER_DEBUG is defined. */
+#ifdef JSON_PARSER_DEBUG
+    #define DEBUG_COMMENT(msg) /* DEBUG: msg */
+    #define DEBUG_NODE(NodeName) \
+        DebugAnnotation(NodeName) { Message = STRINGIFY(msg) }
+#else
+    #define DEBUG_COMMENT(msg)
+    #define DEBUG_NODE(NodeName)
+#endif
+
+/* ---------------------------------------------------------------------- *
+ *  Version and Metadata Macros.                                          *
+ * ---------------------------------------------------------------------- */
+
+#define GRAMMAR_NAME "JSON"
+#define GRAMMAR_VERSION "1.0.0"
+#define GRAMMAR_DATE "2026/10/05"
+#define GRAMMAR_STANDARD "https://json.org"
+
+/* Full version string. */
+#define VERSION_STRING CONCAT(CONCAT(GRAMMAR_NAME, -), GRAMMAR_VERSION)
+
+/* ---------------------------------------------------------------------- *
+ *  Type Aliases — for clarity in complex grammars.                       *
+ * ---------------------------------------------------------------------- */
+
+#define String  char*
+#define Integer int
+#define Float   double
+#define Boolean int
+
+/* ---------------------------------------------------------------------- *
+ *  Reserved for Future Extensions.                                       *
+ * ---------------------------------------------------------------------- */
+
+/* Placeholder for custom extensions. */
+#ifdef JSON_PARSER_EXTENSIONS
+    #include "extensions.gpp"
+#endif
+
+/* ====================================================================== *
+ *  End of Support.gpp                                                     *
+ * ====================================================================== */
+
