@@ -459,6 +459,21 @@ glr_rewrite_remove_unit_productions (grammar);
 glr_rewrite_remove_left_recursion (grammar);
 glr_rewrite_left_factor (grammar);
 glr_rewrite_remove_useless_symbols (grammar);
+glr_rewrite_remove_duplicate_productions (grammar);
+glr_rewrite_remove_self_unit_productions (grammar);
+glr_rewrite_remove_unreachable_symbols (grammar);
+glr_rewrite_remove_unproductive_symbols (grammar);
+glr_rewrite_remove_unused_terminals (grammar);
+glr_rewrite_augment_start_symbol (grammar);
+glr_rewrite_isolate_terminals (grammar);
+glr_rewrite_left_binarize (grammar);
+glr_rewrite_right_binarize (grammar);
+glr_rewrite_chomsky_normal_form (grammar);
+glr_rewrite_right_factor (grammar);
+glr_rewrite_remove_right_recursion (grammar);
+glr_rewrite_reverse_productions (grammar);
+glr_rewrite_inline_single_production_nonterminals (grammar);
+glr_rewrite_merge_equivalent_nonterminals (grammar);
 ```
 
 ### Error handling guidance
@@ -479,6 +494,21 @@ glr_rewrite_remove_useless_symbols (grammar);
 - `eliminate-useless-symbols.grl`
 - `make-lr-compat.grl`
 - `eiminate-ambguity.grl`
+- `remove-duplicate-productions.grl`
+- `remove-self-unit-productions.grl`
+- `eliminate-unreachable-symbols.grl`
+- `eliminate-unproductive-symbols.grl`
+- `eliminate-unused-terminals.grl`
+- `augment-start-symbol.grl`
+- `isolate-terminals.grl`
+- `left-binarize.grl`
+- `right-binarize.grl`
+- `chomsky-normal-form.grl`
+- `right-factor.grl`
+- `remove-right-recursion.grl`
+- `reverse-productions.grl`
+- `inline-single-production-nonterminals.grl`
+- `merge-equivalent-nonterminals.grl`
 
 The last filename keeps the historic typo already present in the tree so the
 repository layout stays stable.

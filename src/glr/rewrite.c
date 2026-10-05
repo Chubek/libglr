@@ -39,6 +39,18 @@ static glr_rewrite_status_t glr_rewrite_eliminate_direct_left_recursion (
 static glr_rewrite_status_t glr_rewrite_factor_head (glr_grammar_t *grammar,
                                                      glr_symbol_t *head,
                                                      size_t *generated_count);
+static glr_rewrite_status_t glr_rewrite_make_unique_name (
+    glr_grammar_t *grammar, const char *base, char *out, size_t out_size);
+static bool glr_rewrite_production_has_metadata (
+    const glr_production_t *production);
+static glr_rewrite_status_t glr_rewrite_expand_indirect_right_recursion (
+    glr_grammar_t *grammar, glr_symbol_t *ai, glr_symbol_t *aj);
+static glr_rewrite_status_t glr_rewrite_eliminate_direct_right_recursion (
+    glr_grammar_t *grammar, glr_symbol_t *symbol, size_t suffix_index);
+static glr_rewrite_status_t glr_rewrite_factor_head_right (
+    glr_grammar_t *grammar, glr_symbol_t *head, size_t *generated_count);
+static glr_rewrite_status_t glr_rewrite_binarize_impl (glr_grammar_t *grammar,
+                                                       bool left);
 static bool glr_rewrite_is_atom (const sexp_t *node, const char *value);
 static const char *glr_rewrite_atom_text (const sexp_t *node);
 static glr_rewrite_status_t glr_rewrite_parse_rule (glr_rewrite_program_t *p,
@@ -1076,6 +1088,66 @@ glr_rewrite_parse_rule (glr_rewrite_program_t *program, const sexp_t *node,
     {
       rule.kind = GLR_REWRITE_RULE_ELIMINATE_AMBIGUITY;
     }
+  else if (strcmp (op, "remove-duplicate-productions") == 0)
+    {
+      rule.kind = GLR_REWRITE_RULE_REMOVE_DUPLICATE_PRODUCTIONS;
+    }
+  else if (strcmp (op, "remove-self-unit-productions") == 0)
+    {
+      rule.kind = GLR_REWRITE_RULE_REMOVE_SELF_UNIT_PRODUCTIONS;
+    }
+  else if (strcmp (op, "eliminate-unreachable-symbols") == 0)
+    {
+      rule.kind = GLR_REWRITE_RULE_REMOVE_UNREACHABLE_SYMBOLS;
+    }
+  else if (strcmp (op, "eliminate-unproductive-symbols") == 0)
+    {
+      rule.kind = GLR_REWRITE_RULE_REMOVE_UNPRODUCTIVE_SYMBOLS;
+    }
+  else if (strcmp (op, "eliminate-unused-terminals") == 0)
+    {
+      rule.kind = GLR_REWRITE_RULE_REMOVE_UNUSED_TERMINALS;
+    }
+  else if (strcmp (op, "augment-start-symbol") == 0)
+    {
+      rule.kind = GLR_REWRITE_RULE_AUGMENT_START_SYMBOL;
+    }
+  else if (strcmp (op, "isolate-terminals") == 0)
+    {
+      rule.kind = GLR_REWRITE_RULE_ISOLATE_TERMINALS;
+    }
+  else if (strcmp (op, "left-binarize") == 0)
+    {
+      rule.kind = GLR_REWRITE_RULE_LEFT_BINARIZE;
+    }
+  else if (strcmp (op, "right-binarize") == 0)
+    {
+      rule.kind = GLR_REWRITE_RULE_RIGHT_BINARIZE;
+    }
+  else if (strcmp (op, "chomsky-normal-form") == 0)
+    {
+      rule.kind = GLR_REWRITE_RULE_CHOMSKY_NORMAL_FORM;
+    }
+  else if (strcmp (op, "right-factor") == 0)
+    {
+      rule.kind = GLR_REWRITE_RULE_RIGHT_FACTOR;
+    }
+  else if (strcmp (op, "remove-right-recursion") == 0)
+    {
+      rule.kind = GLR_REWRITE_RULE_REMOVE_RIGHT_RECURSION;
+    }
+  else if (strcmp (op, "reverse-productions") == 0)
+    {
+      rule.kind = GLR_REWRITE_RULE_REVERSE_PRODUCTIONS;
+    }
+  else if (strcmp (op, "inline-single-production-nonterminals") == 0)
+    {
+      rule.kind = GLR_REWRITE_RULE_INLINE_SINGLE_PRODUCTION_NONTERMINALS;
+    }
+  else if (strcmp (op, "merge-equivalent-nonterminals") == 0)
+    {
+      rule.kind = GLR_REWRITE_RULE_MERGE_EQUIVALENT_NONTERMINALS;
+    }
   else
     {
       glr_rewrite_set_error (error_buffer, error_size,
@@ -1398,6 +1470,36 @@ glr_rewrite_apply_rule (glr_grammar_t *grammar, const glr_rewrite_rule_t *rule)
       return glr_rewrite_make_lr_compatible (grammar);
     case GLR_REWRITE_RULE_ELIMINATE_AMBIGUITY:
       return glr_rewrite_eliminate_ambiguity (grammar);
+    case GLR_REWRITE_RULE_REMOVE_DUPLICATE_PRODUCTIONS:
+      return glr_rewrite_remove_duplicate_productions (grammar);
+    case GLR_REWRITE_RULE_REMOVE_SELF_UNIT_PRODUCTIONS:
+      return glr_rewrite_remove_self_unit_productions (grammar);
+    case GLR_REWRITE_RULE_REMOVE_UNREACHABLE_SYMBOLS:
+      return glr_rewrite_remove_unreachable_symbols (grammar);
+    case GLR_REWRITE_RULE_REMOVE_UNPRODUCTIVE_SYMBOLS:
+      return glr_rewrite_remove_unproductive_symbols (grammar);
+    case GLR_REWRITE_RULE_REMOVE_UNUSED_TERMINALS:
+      return glr_rewrite_remove_unused_terminals (grammar);
+    case GLR_REWRITE_RULE_AUGMENT_START_SYMBOL:
+      return glr_rewrite_augment_start_symbol (grammar);
+    case GLR_REWRITE_RULE_ISOLATE_TERMINALS:
+      return glr_rewrite_isolate_terminals (grammar);
+    case GLR_REWRITE_RULE_LEFT_BINARIZE:
+      return glr_rewrite_left_binarize (grammar);
+    case GLR_REWRITE_RULE_RIGHT_BINARIZE:
+      return glr_rewrite_right_binarize (grammar);
+    case GLR_REWRITE_RULE_CHOMSKY_NORMAL_FORM:
+      return glr_rewrite_chomsky_normal_form (grammar);
+    case GLR_REWRITE_RULE_RIGHT_FACTOR:
+      return glr_rewrite_right_factor (grammar);
+    case GLR_REWRITE_RULE_REMOVE_RIGHT_RECURSION:
+      return glr_rewrite_remove_right_recursion (grammar);
+    case GLR_REWRITE_RULE_REVERSE_PRODUCTIONS:
+      return glr_rewrite_reverse_productions (grammar);
+    case GLR_REWRITE_RULE_INLINE_SINGLE_PRODUCTION_NONTERMINALS:
+      return glr_rewrite_inline_single_production_nonterminals (grammar);
+    case GLR_REWRITE_RULE_MERGE_EQUIVALENT_NONTERMINALS:
+      return glr_rewrite_merge_equivalent_nonterminals (grammar);
     }
 
   return GLR_REWRITE_STATUS_UNSUPPORTED;
@@ -2066,4 +2168,1567 @@ glr_rewrite_eliminate_ambiguity (glr_grammar_t *grammar)
 
   return conflicts == 0 ? GLR_REWRITE_STATUS_OK
                         : GLR_REWRITE_STATUS_CONFLICT;
+}
+
+/* ------------------------------------------------------------------ */
+/* Shared helpers for the extended rewrite library                    */
+/* ------------------------------------------------------------------ */
+
+static glr_rewrite_status_t
+glr_rewrite_make_unique_name (glr_grammar_t *grammar, const char *base,
+                              char *out, size_t out_size)
+{
+  int written;
+
+  if (grammar == NULL || base == NULL || out == NULL || out_size == 0)
+    {
+      return GLR_REWRITE_STATUS_INVALID_ARGUMENT;
+    }
+
+  written = snprintf (out, out_size, "%s", base);
+  if (written < 0 || (size_t) written >= out_size)
+    {
+      return GLR_REWRITE_STATUS_MEMORY_ERROR;
+    }
+  if (glr_rewrite_find_symbol (grammar, out) == NULL)
+    {
+      return GLR_REWRITE_STATUS_OK;
+    }
+
+  for (size_t counter = 1; counter < 1000000; counter++)
+    {
+      written = snprintf (out, out_size, "%s__%zu", base, counter);
+      if (written < 0 || (size_t) written >= out_size)
+        {
+          continue;
+        }
+      if (glr_rewrite_find_symbol (grammar, out) == NULL)
+        {
+          return GLR_REWRITE_STATUS_OK;
+        }
+    }
+
+  return GLR_REWRITE_STATUS_CONFLICT;
+}
+
+static bool
+glr_rewrite_production_has_metadata (const glr_production_t *production)
+{
+  return production != NULL
+         && (production->annotation != NULL || production->aliases != NULL
+             || production->semantic_action != NULL);
+}
+
+static bool
+glr_rewrite_bodies_equal (const glr_production_t *a,
+                          const glr_production_t *b)
+{
+  size_t i;
+
+  if (a == NULL || b == NULL || a->head != b->head
+      || a->body_length != b->body_length)
+    {
+      return false;
+    }
+
+  for (i = 0; i < a->body_length; i++)
+    {
+      if (a->body[i] != b->body[i])
+        {
+          return false;
+        }
+    }
+
+  return true;
+}
+
+glr_rewrite_status_t
+glr_rewrite_remove_duplicate_productions (glr_grammar_t *grammar)
+{
+  size_t i;
+  size_t j;
+
+  if (grammar == NULL)
+    {
+      return GLR_REWRITE_STATUS_INVALID_ARGUMENT;
+    }
+
+  /* Productions carrying semantic payloads are never candidates: dropping
+     one of two structurally identical but semantically distinct productions
+     would silently change the parser's actions. */
+  for (i = grammar->production_count; i > 0; i--)
+    {
+      glr_production_t *candidate = grammar->productions[i - 1];
+
+      if (glr_rewrite_production_has_metadata (candidate))
+        {
+          continue;
+        }
+
+      for (j = 0; j < i - 1; j++)
+        {
+          glr_production_t *earlier = grammar->productions[j];
+          if (!glr_rewrite_production_has_metadata (earlier)
+              && glr_rewrite_bodies_equal (earlier, candidate))
+            {
+              glr_rewrite_remove_production_at (grammar, i - 1);
+              break;
+            }
+        }
+    }
+
+  return GLR_REWRITE_STATUS_OK;
+}
+
+glr_rewrite_status_t
+glr_rewrite_remove_self_unit_productions (glr_grammar_t *grammar)
+{
+  size_t i;
+
+  if (grammar == NULL)
+    {
+      return GLR_REWRITE_STATUS_INVALID_ARGUMENT;
+    }
+
+  for (i = grammar->production_count; i > 0; i--)
+    {
+      glr_production_t *production = grammar->productions[i - 1];
+      if (production->body_length == 1 && production->body[0] == production->head)
+        {
+          glr_rewrite_remove_production_at (grammar, i - 1);
+        }
+    }
+
+  return GLR_REWRITE_STATUS_OK;
+}
+
+glr_rewrite_status_t
+glr_rewrite_remove_unreachable_symbols (glr_grammar_t *grammar)
+{
+  bool *reachable;
+  bool *keep_productions;
+  bool *keep_symbols;
+  bool changed = true;
+  size_t i;
+  glr_rewrite_status_t status;
+
+  if (grammar == NULL || grammar->start_symbol == NULL)
+    {
+      return GLR_REWRITE_STATUS_INVALID_ARGUMENT;
+    }
+
+  reachable = calloc (grammar->symbol_count == 0 ? 1 : grammar->symbol_count,
+                      sizeof (*reachable));
+  keep_symbols = calloc (grammar->symbol_count == 0 ? 1 : grammar->symbol_count,
+                         sizeof (*keep_symbols));
+  keep_productions = calloc (
+      grammar->production_count == 0 ? 1 : grammar->production_count,
+      sizeof (*keep_productions));
+  if (reachable == NULL || keep_symbols == NULL || keep_productions == NULL)
+    {
+      free (reachable);
+      free (keep_symbols);
+      free (keep_productions);
+      return GLR_REWRITE_STATUS_MEMORY_ERROR;
+    }
+
+  reachable[grammar->start_symbol->id] = true;
+  while (changed)
+    {
+      changed = false;
+      for (i = 0; i < grammar->production_count; i++)
+        {
+          glr_production_t *production = grammar->productions[i];
+          if (!reachable[production->head->id])
+            {
+              continue;
+            }
+          for (size_t j = 0; j < production->body_length; j++)
+            {
+              if (!reachable[production->body[j]->id])
+                {
+                  reachable[production->body[j]->id] = true;
+                  changed = true;
+                }
+            }
+        }
+    }
+
+  for (i = 0; i < grammar->symbol_count; i++)
+    {
+      keep_symbols[i] = reachable[i];
+    }
+  for (i = 0; i < grammar->production_count; i++)
+    {
+      keep_productions[i]
+          = reachable[grammar->productions[i]->head->id] != false;
+    }
+
+  status = glr_rewrite_rebuild_grammar (grammar, keep_symbols, keep_productions);
+  free (reachable);
+  free (keep_symbols);
+  free (keep_productions);
+  return status;
+}
+
+glr_rewrite_status_t
+glr_rewrite_remove_unproductive_symbols (glr_grammar_t *grammar)
+{
+  bool *productive;
+  bool *keep_symbols;
+  bool *keep_productions;
+  bool changed = true;
+  size_t i;
+  glr_rewrite_status_t status;
+
+  if (grammar == NULL || grammar->start_symbol == NULL)
+    {
+      return GLR_REWRITE_STATUS_INVALID_ARGUMENT;
+    }
+
+  productive = calloc (grammar->symbol_count == 0 ? 1 : grammar->symbol_count,
+                       sizeof (*productive));
+  keep_symbols = calloc (grammar->symbol_count == 0 ? 1 : grammar->symbol_count,
+                         sizeof (*keep_symbols));
+  keep_productions = calloc (
+      grammar->production_count == 0 ? 1 : grammar->production_count,
+      sizeof (*keep_productions));
+  if (productive == NULL || keep_symbols == NULL || keep_productions == NULL)
+    {
+      free (productive);
+      free (keep_symbols);
+      free (keep_productions);
+      return GLR_REWRITE_STATUS_MEMORY_ERROR;
+    }
+
+  for (i = 0; i < grammar->symbol_count; i++)
+    {
+      if (grammar->symbols[i]->type == GLR_SYMBOL_TERMINAL)
+        {
+          productive[i] = true;
+        }
+    }
+
+  while (changed)
+    {
+      changed = false;
+      for (i = 0; i < grammar->production_count; i++)
+        {
+          glr_production_t *production = grammar->productions[i];
+          bool all_productive = true;
+          for (size_t j = 0; j < production->body_length; j++)
+            {
+              if (!productive[production->body[j]->id])
+                {
+                  all_productive = false;
+                  break;
+                }
+            }
+          if (all_productive && !productive[production->head->id])
+            {
+              productive[production->head->id] = true;
+              changed = true;
+            }
+        }
+    }
+
+  for (i = 0; i < grammar->symbol_count; i++)
+    {
+      keep_symbols[i] = productive[i];
+    }
+  /* Retain an unproductive start symbol so the result still denotes the
+     empty language instead of becoming a grammar with no start. */
+  keep_symbols[grammar->start_symbol->id] = true;
+
+  for (i = 0; i < grammar->production_count; i++)
+    {
+      glr_production_t *production = grammar->productions[i];
+      bool keep = productive[production->head->id];
+      for (size_t j = 0; keep && j < production->body_length; j++)
+        {
+          keep = productive[production->body[j]->id];
+        }
+      keep_productions[i] = keep;
+    }
+
+  status = glr_rewrite_rebuild_grammar (grammar, keep_symbols, keep_productions);
+  free (productive);
+  free (keep_symbols);
+  free (keep_productions);
+  return status;
+}
+
+glr_rewrite_status_t
+glr_rewrite_remove_unused_terminals (glr_grammar_t *grammar)
+{
+  bool *keep_symbols;
+  bool *keep_productions;
+  size_t i;
+  glr_rewrite_status_t status;
+
+  if (grammar == NULL)
+    {
+      return GLR_REWRITE_STATUS_INVALID_ARGUMENT;
+    }
+
+  keep_symbols = calloc (grammar->symbol_count == 0 ? 1 : grammar->symbol_count,
+                         sizeof (*keep_symbols));
+  keep_productions = calloc (
+      grammar->production_count == 0 ? 1 : grammar->production_count,
+      sizeof (*keep_productions));
+  if (keep_symbols == NULL || keep_productions == NULL)
+    {
+      free (keep_symbols);
+      free (keep_productions);
+      return GLR_REWRITE_STATUS_MEMORY_ERROR;
+    }
+
+  for (i = 0; i < grammar->symbol_count; i++)
+    {
+      keep_symbols[i]
+          = grammar->symbols[i]->type == GLR_SYMBOL_NONTERMINAL;
+    }
+  for (i = 0; i < grammar->production_count; i++)
+    {
+      glr_production_t *production = grammar->productions[i];
+      for (size_t j = 0; j < production->body_length; j++)
+        {
+          if (production->body[j]->type == GLR_SYMBOL_TERMINAL)
+            {
+              keep_symbols[production->body[j]->id] = true;
+            }
+        }
+    }
+
+  for (i = 0; i < grammar->production_count; i++)
+    {
+      glr_production_t *production = grammar->productions[i];
+      bool keep = keep_symbols[production->head->id];
+      for (size_t j = 0; keep && j < production->body_length; j++)
+        {
+          keep = keep_symbols[production->body[j]->id];
+        }
+      keep_productions[i] = keep;
+    }
+
+  status = glr_rewrite_rebuild_grammar (grammar, keep_symbols, keep_productions);
+  free (keep_symbols);
+  free (keep_productions);
+  return status;
+}
+
+glr_rewrite_status_t
+glr_rewrite_augment_start_symbol (glr_grammar_t *grammar)
+{
+  glr_symbol_t *old_start;
+  glr_symbol_t *new_start;
+  glr_symbol_t *body[1];
+  char base[256];
+  char fresh[256];
+  int written;
+
+  if (grammar == NULL || grammar->start_symbol == NULL)
+    {
+      return GLR_REWRITE_STATUS_INVALID_ARGUMENT;
+    }
+
+  old_start = grammar->start_symbol;
+  if (old_start->type != GLR_SYMBOL_NONTERMINAL)
+    {
+      return GLR_REWRITE_STATUS_CONFLICT;
+    }
+
+  written = snprintf (base, sizeof (base), "%s__aug", old_start->name);
+  if (written < 0 || (size_t) written >= sizeof (base))
+    {
+      return GLR_REWRITE_STATUS_MEMORY_ERROR;
+    }
+  if (glr_rewrite_make_unique_name (grammar, base, fresh, sizeof (fresh))
+      != GLR_REWRITE_STATUS_OK)
+    {
+      return GLR_REWRITE_STATUS_MEMORY_ERROR;
+    }
+  if (glr_rewrite_add_symbol (grammar, GLR_SYMBOL_NONTERMINAL, fresh)
+      != GLR_REWRITE_STATUS_OK)
+    {
+      return GLR_REWRITE_STATUS_MEMORY_ERROR;
+    }
+
+  new_start = glr_rewrite_find_symbol (grammar, fresh);
+  if (new_start == NULL)
+    {
+      return GLR_REWRITE_STATUS_MEMORY_ERROR;
+    }
+
+  body[0] = old_start;
+  if (glr_grammar_add_production (grammar, new_start->id, body, 1) < 0)
+    {
+      return GLR_REWRITE_STATUS_MEMORY_ERROR;
+    }
+
+  grammar->start_symbol = new_start;
+  return GLR_REWRITE_STATUS_OK;
+}
+
+glr_rewrite_status_t
+glr_rewrite_isolate_terminals (glr_grammar_t *grammar)
+{
+  bool *needs_wrapper;
+  glr_symbol_t **wrappers;
+  size_t initial_symbols;
+  size_t i;
+
+  if (grammar == NULL)
+    {
+      return GLR_REWRITE_STATUS_INVALID_ARGUMENT;
+    }
+
+  initial_symbols = grammar->symbol_count;
+  needs_wrapper = calloc (initial_symbols == 0 ? 1 : initial_symbols,
+                          sizeof (*needs_wrapper));
+  wrappers = calloc (initial_symbols == 0 ? 1 : initial_symbols,
+                     sizeof (*wrappers));
+  if (needs_wrapper == NULL || wrappers == NULL)
+    {
+      free (needs_wrapper);
+      free (wrappers);
+      return GLR_REWRITE_STATUS_MEMORY_ERROR;
+    }
+
+  for (i = 0; i < grammar->production_count; i++)
+    {
+      glr_production_t *production = grammar->productions[i];
+      if (production->body_length < 2)
+        {
+          continue;
+        }
+      for (size_t j = 0; j < production->body_length; j++)
+        {
+          glr_symbol_t *symbol = production->body[j];
+          if (symbol->type == GLR_SYMBOL_TERMINAL
+              && (size_t) symbol->id < initial_symbols)
+            {
+              needs_wrapper[symbol->id] = true;
+            }
+        }
+    }
+
+  for (i = 0; i < initial_symbols; i++)
+    {
+      glr_symbol_t *terminal;
+      glr_symbol_t *wrapper;
+      glr_symbol_t *body[1];
+      char base[256];
+      char fresh[256];
+      int written;
+
+      if (!needs_wrapper[i])
+        {
+          continue;
+        }
+      terminal = grammar->symbols[i];
+      if (terminal->type != GLR_SYMBOL_TERMINAL)
+        {
+          continue;
+        }
+
+      written = snprintf (base, sizeof (base), "%s__tok", terminal->name);
+      if (written < 0 || (size_t) written >= sizeof (base))
+        {
+          free (needs_wrapper);
+          free (wrappers);
+          return GLR_REWRITE_STATUS_MEMORY_ERROR;
+        }
+      if (glr_rewrite_make_unique_name (grammar, base, fresh, sizeof (fresh))
+          != GLR_REWRITE_STATUS_OK)
+        {
+          free (needs_wrapper);
+          free (wrappers);
+          return GLR_REWRITE_STATUS_MEMORY_ERROR;
+        }
+      if (glr_rewrite_add_symbol (grammar, GLR_SYMBOL_NONTERMINAL, fresh)
+          != GLR_REWRITE_STATUS_OK)
+        {
+          free (needs_wrapper);
+          free (wrappers);
+          return GLR_REWRITE_STATUS_MEMORY_ERROR;
+        }
+      wrapper = glr_rewrite_find_symbol (grammar, fresh);
+      if (wrapper == NULL)
+        {
+          free (needs_wrapper);
+          free (wrappers);
+          return GLR_REWRITE_STATUS_MEMORY_ERROR;
+        }
+      wrappers[i] = wrapper;
+
+      body[0] = terminal;
+      if (glr_grammar_add_production (grammar, wrapper->id, body, 1) < 0)
+        {
+          free (needs_wrapper);
+          free (wrappers);
+          return GLR_REWRITE_STATUS_MEMORY_ERROR;
+        }
+    }
+
+  for (i = 0; i < grammar->production_count; i++)
+    {
+      glr_production_t *production = grammar->productions[i];
+      if (production->body_length < 2)
+        {
+          continue;
+        }
+      for (size_t j = 0; j < production->body_length; j++)
+        {
+          glr_symbol_t *symbol = production->body[j];
+          if (symbol->type == GLR_SYMBOL_TERMINAL
+              && (size_t) symbol->id < initial_symbols
+              && wrappers[symbol->id] != NULL)
+            {
+              production->body[j] = wrappers[symbol->id];
+            }
+        }
+    }
+
+  free (needs_wrapper);
+  free (wrappers);
+  return GLR_REWRITE_STATUS_OK;
+}
+
+static glr_rewrite_status_t
+glr_rewrite_binarize_impl (glr_grammar_t *grammar, bool left)
+{
+  size_t counter = 0;
+  size_t original_count;
+
+  if (grammar == NULL)
+    {
+      return GLR_REWRITE_STATUS_INVALID_ARGUMENT;
+    }
+
+  original_count = grammar->production_count;
+  for (size_t index = original_count; index > 0; index--)
+    {
+      glr_production_t *production = grammar->productions[index - 1];
+      glr_symbol_t *head;
+      glr_symbol_t *items[128];
+      glr_symbol_t *helpers[128];
+      size_t length;
+      size_t helper_count;
+
+      if (production->body_length <= 2)
+        {
+          continue;
+        }
+      if (production->body_length > 128)
+        {
+          return GLR_REWRITE_STATUS_UNSUPPORTED;
+        }
+
+      head = production->head;
+      length = production->body_length;
+      for (size_t j = 0; j < length; j++)
+        {
+          items[j] = production->body[j];
+        }
+      helper_count = length - 2;
+
+      for (size_t k = 0; k < helper_count; k++)
+        {
+          char base[256];
+          char fresh[256];
+          int written = snprintf (base, sizeof (base), "%s__%s%zu", head->name,
+                                  left ? "lb" : "rb", counter++);
+          if (written < 0 || (size_t) written >= sizeof (base))
+            {
+              return GLR_REWRITE_STATUS_MEMORY_ERROR;
+            }
+          if (glr_rewrite_make_unique_name (grammar, base, fresh,
+                                            sizeof (fresh))
+              != GLR_REWRITE_STATUS_OK)
+            {
+              return GLR_REWRITE_STATUS_MEMORY_ERROR;
+            }
+          if (glr_rewrite_add_symbol (grammar, GLR_SYMBOL_NONTERMINAL, fresh)
+              != GLR_REWRITE_STATUS_OK)
+            {
+              return GLR_REWRITE_STATUS_MEMORY_ERROR;
+            }
+          helpers[k] = glr_rewrite_find_symbol (grammar, fresh);
+          if (helpers[k] == NULL)
+            {
+              return GLR_REWRITE_STATUS_MEMORY_ERROR;
+            }
+        }
+
+      glr_rewrite_remove_production_at (grammar, index - 1);
+
+      if (left)
+        {
+          glr_symbol_t *pair[2];
+          if (glr_grammar_add_production (grammar, helpers[0]->id, items, 2)
+              < 0)
+            {
+              return GLR_REWRITE_STATUS_MEMORY_ERROR;
+            }
+          for (size_t k = 1; k < helper_count; k++)
+            {
+              pair[0] = helpers[k - 1];
+              pair[1] = items[k + 1];
+              if (glr_grammar_add_production (grammar, helpers[k]->id, pair, 2)
+                  < 0)
+                {
+                  return GLR_REWRITE_STATUS_MEMORY_ERROR;
+                }
+            }
+          pair[0] = helpers[helper_count - 1];
+          pair[1] = items[length - 1];
+          if (glr_grammar_add_production (grammar, head->id, pair, 2) < 0)
+            {
+              return GLR_REWRITE_STATUS_MEMORY_ERROR;
+            }
+        }
+      else
+        {
+          glr_symbol_t *pair[2] = { items[0], helpers[0] };
+          if (glr_grammar_add_production (grammar, head->id, pair, 2) < 0)
+            {
+              return GLR_REWRITE_STATUS_MEMORY_ERROR;
+            }
+          for (size_t k = 0; k + 1 < helper_count; k++)
+            {
+              pair[0] = items[k + 1];
+              pair[1] = helpers[k + 1];
+              if (glr_grammar_add_production (grammar, helpers[k]->id, pair, 2)
+                  < 0)
+                {
+                  return GLR_REWRITE_STATUS_MEMORY_ERROR;
+                }
+            }
+          pair[0] = items[length - 2];
+          pair[1] = items[length - 1];
+          if (glr_grammar_add_production (grammar,
+                                          helpers[helper_count - 1]->id, pair,
+                                          2)
+              < 0)
+            {
+              return GLR_REWRITE_STATUS_MEMORY_ERROR;
+            }
+        }
+    }
+
+  return GLR_REWRITE_STATUS_OK;
+}
+
+glr_rewrite_status_t
+glr_rewrite_left_binarize (glr_grammar_t *grammar)
+{
+  return glr_rewrite_binarize_impl (grammar, true);
+}
+
+glr_rewrite_status_t
+glr_rewrite_right_binarize (glr_grammar_t *grammar)
+{
+  return glr_rewrite_binarize_impl (grammar, false);
+}
+
+static glr_rewrite_status_t
+glr_rewrite_factor_head_right (glr_grammar_t *grammar, glr_symbol_t *head,
+                               size_t *generated_count)
+{
+  size_t i;
+
+  if (grammar == NULL || head == NULL || generated_count == NULL)
+    {
+      return GLR_REWRITE_STATUS_INVALID_ARGUMENT;
+    }
+
+  for (i = 0; i < grammar->production_count; i++)
+    {
+      glr_production_t *first = grammar->productions[i];
+      if (first->head != head || first->body_length == 0)
+        {
+          continue;
+        }
+
+      for (size_t j = i + 1; j < grammar->production_count; j++)
+        {
+          glr_production_t *second = grammar->productions[j];
+          char base[256];
+          char fresh[256];
+          glr_symbol_t *factored;
+          glr_symbol_t *new_body[2];
+          glr_symbol_t *tail_body[128];
+          glr_symbol_t *first_prefix[128];
+          glr_symbol_t *second_prefix[128];
+          size_t tail_len;
+          int written;
+
+          if (second->head != head || second->body_length == 0
+              || second->body[second->body_length - 1]
+                     != first->body[first->body_length - 1])
+            {
+              continue;
+            }
+
+          written = snprintf (base, sizeof (base), "%s__rf%zu", head->name,
+                              *generated_count);
+          if (written < 0 || (size_t) written >= sizeof (base))
+            {
+              return GLR_REWRITE_STATUS_MEMORY_ERROR;
+            }
+          if (glr_rewrite_make_unique_name (grammar, base, fresh,
+                                            sizeof (fresh))
+              != GLR_REWRITE_STATUS_OK)
+            {
+              return GLR_REWRITE_STATUS_MEMORY_ERROR;
+            }
+          if (glr_rewrite_add_symbol (grammar, GLR_SYMBOL_NONTERMINAL, fresh)
+              != GLR_REWRITE_STATUS_OK)
+            {
+              return GLR_REWRITE_STATUS_MEMORY_ERROR;
+            }
+          factored = glr_rewrite_find_symbol (grammar, fresh);
+          if (factored == NULL)
+            {
+              return GLR_REWRITE_STATUS_MEMORY_ERROR;
+            }
+          (*generated_count)++;
+
+          new_body[0] = factored;
+          new_body[1] = first->body[first->body_length - 1];
+
+          for (size_t k = 0; k + 1 < first->body_length; k++)
+            {
+              first_prefix[k] = first->body[k];
+            }
+          for (size_t k = 0; k + 1 < second->body_length; k++)
+            {
+              second_prefix[k] = second->body[k];
+            }
+
+          glr_rewrite_remove_production_at (grammar, j);
+          glr_rewrite_remove_production_at (grammar, i);
+          if (glr_grammar_add_production (grammar, head->id, new_body, 2) < 0)
+            {
+              return GLR_REWRITE_STATUS_MEMORY_ERROR;
+            }
+
+          tail_len = first->body_length - 1;
+          for (size_t k = 0; k < tail_len; k++)
+            {
+              tail_body[k] = first_prefix[k];
+            }
+          if (glr_grammar_add_production (grammar, factored->id, tail_body,
+                                           tail_len)
+              < 0)
+            {
+              return GLR_REWRITE_STATUS_MEMORY_ERROR;
+            }
+
+          tail_len = second->body_length - 1;
+          for (size_t k = 0; k < tail_len; k++)
+            {
+              tail_body[k] = second_prefix[k];
+            }
+          if (glr_grammar_add_production (grammar, factored->id, tail_body,
+                                           tail_len)
+              < 0)
+            {
+              return GLR_REWRITE_STATUS_MEMORY_ERROR;
+            }
+
+          return GLR_REWRITE_STATUS_OK;
+        }
+    }
+
+  return GLR_REWRITE_STATUS_NOT_FOUND;
+}
+
+glr_rewrite_status_t
+glr_rewrite_right_factor (glr_grammar_t *grammar)
+{
+  size_t generated_count = 0;
+  bool changed = true;
+
+  if (grammar == NULL)
+    {
+      return GLR_REWRITE_STATUS_INVALID_ARGUMENT;
+    }
+
+  while (changed)
+    {
+      changed = false;
+      for (size_t i = 0; i < grammar->symbol_count; i++)
+        {
+          glr_symbol_t *symbol = grammar->symbols[i];
+          if (symbol->type != GLR_SYMBOL_NONTERMINAL)
+            {
+              continue;
+            }
+          if (glr_rewrite_factor_head_right (grammar, symbol, &generated_count)
+              == GLR_REWRITE_STATUS_OK)
+            {
+              changed = true;
+              break;
+            }
+        }
+    }
+
+  return GLR_REWRITE_STATUS_OK;
+}
+
+static glr_rewrite_status_t
+glr_rewrite_expand_indirect_right_recursion (glr_grammar_t *grammar,
+                                            glr_symbol_t *ai,
+                                            glr_symbol_t *aj)
+{
+  size_t original_count;
+
+  if (grammar == NULL || ai == NULL || aj == NULL)
+    {
+      return GLR_REWRITE_STATUS_INVALID_ARGUMENT;
+    }
+
+  original_count = grammar->production_count;
+  for (size_t i = 0; i < original_count;)
+    {
+      glr_production_t *production = grammar->productions[i];
+      size_t generated = 0;
+
+      if (production->head != ai || production->body_length == 0
+          || production->body[production->body_length - 1] != aj)
+        {
+          i++;
+          continue;
+        }
+
+      for (size_t j = 0; j < original_count; j++)
+        {
+          glr_production_t *suffix = grammar->productions[j];
+          glr_symbol_t *body[128];
+          size_t body_length = 0;
+
+          if (suffix->head != aj)
+            {
+              continue;
+            }
+
+          if (production->body_length - 1 + suffix->body_length > 128)
+            {
+              return GLR_REWRITE_STATUS_UNSUPPORTED;
+            }
+
+          for (size_t k = 0; k + 1 < production->body_length; k++)
+            {
+              body[body_length++] = production->body[k];
+            }
+          for (size_t k = 0; k < suffix->body_length; k++)
+            {
+              body[body_length++] = suffix->body[k];
+            }
+
+          if (!glr_rewrite_production_exists (grammar, ai, body, body_length))
+            {
+              if (glr_grammar_add_production (grammar, ai->id, body, body_length)
+                  < 0)
+                {
+                  return GLR_REWRITE_STATUS_MEMORY_ERROR;
+                }
+              generated++;
+            }
+        }
+
+      glr_rewrite_remove_production_at (grammar, i);
+      original_count--;
+      if (generated == 0)
+        {
+          continue;
+        }
+    }
+
+  return GLR_REWRITE_STATUS_OK;
+}
+
+static glr_rewrite_status_t
+glr_rewrite_eliminate_direct_right_recursion (glr_grammar_t *grammar,
+                                             glr_symbol_t *symbol,
+                                             size_t suffix_index)
+{
+  typedef struct
+  {
+    glr_symbol_t *body[128];
+    size_t body_length;
+  } glr_rewrite_body_copy_t;
+
+  size_t alpha_count = 0;
+  size_t beta_count = 0;
+  glr_rewrite_body_copy_t *alpha = NULL;
+  glr_rewrite_body_copy_t *beta = NULL;
+  glr_symbol_t *prefix;
+  char base[256];
+  char fresh[256];
+  int written;
+
+  if (grammar == NULL || symbol == NULL)
+    {
+      return GLR_REWRITE_STATUS_INVALID_ARGUMENT;
+    }
+
+  for (size_t i = 0; i < grammar->production_count; i++)
+    {
+      glr_production_t *production = grammar->productions[i];
+      if (production->head != symbol)
+        {
+          continue;
+        }
+
+      if (production->body_length > 0
+          && production->body[production->body_length - 1] == symbol)
+        {
+          alpha_count++;
+        }
+      else
+        {
+          beta_count++;
+        }
+    }
+
+  if (alpha_count == 0)
+    {
+      return GLR_REWRITE_STATUS_OK;
+    }
+
+  alpha = calloc (alpha_count, sizeof (*alpha));
+  beta = calloc (beta_count == 0 ? 1 : beta_count, sizeof (*beta));
+  if (alpha == NULL || beta == NULL)
+    {
+      free (alpha);
+      free (beta);
+      return GLR_REWRITE_STATUS_MEMORY_ERROR;
+    }
+
+  alpha_count = 0;
+  beta_count = 0;
+  for (size_t i = 0; i < grammar->production_count; i++)
+    {
+      glr_production_t *production = grammar->productions[i];
+      if (production->head != symbol)
+        {
+          continue;
+        }
+
+      if (production->body_length > 0
+          && production->body[production->body_length - 1] == symbol)
+        {
+          alpha[alpha_count].body_length = production->body_length;
+          for (size_t j = 0; j < production->body_length; j++)
+            {
+              alpha[alpha_count].body[j] = production->body[j];
+            }
+          alpha_count++;
+        }
+      else
+        {
+          beta[beta_count].body_length = production->body_length;
+          for (size_t j = 0; j < production->body_length; j++)
+            {
+              beta[beta_count].body[j] = production->body[j];
+            }
+          beta_count++;
+        }
+    }
+
+  written = snprintf (base, sizeof (base), "%s__rr%zu", symbol->name,
+                      suffix_index);
+  if (written < 0 || (size_t) written >= sizeof (base))
+    {
+      free (alpha);
+      free (beta);
+      return GLR_REWRITE_STATUS_MEMORY_ERROR;
+    }
+  if (glr_rewrite_make_unique_name (grammar, base, fresh, sizeof (fresh))
+      != GLR_REWRITE_STATUS_OK)
+    {
+      free (alpha);
+      free (beta);
+      return GLR_REWRITE_STATUS_MEMORY_ERROR;
+    }
+  if (glr_rewrite_add_symbol (grammar, GLR_SYMBOL_NONTERMINAL, fresh)
+      != GLR_REWRITE_STATUS_OK)
+    {
+      free (alpha);
+      free (beta);
+      return GLR_REWRITE_STATUS_MEMORY_ERROR;
+    }
+  prefix = glr_rewrite_find_symbol (grammar, fresh);
+  if (prefix == NULL)
+    {
+      free (alpha);
+      free (beta);
+      return GLR_REWRITE_STATUS_MEMORY_ERROR;
+    }
+
+  for (size_t i = grammar->production_count; i > 0; i--)
+    {
+      glr_production_t *production = grammar->productions[i - 1];
+      if (production->head == symbol)
+        {
+          glr_rewrite_remove_production_at (grammar, i - 1);
+        }
+    }
+
+  if (beta_count == 0)
+    {
+      glr_symbol_t *body[1] = { prefix };
+      if (glr_grammar_add_production (grammar, symbol->id, body, 1) < 0)
+        {
+          free (alpha);
+          free (beta);
+          return GLR_REWRITE_STATUS_MEMORY_ERROR;
+        }
+    }
+
+  for (size_t i = 0; i < beta_count; i++)
+    {
+      glr_symbol_t *body[128];
+      size_t body_length = 0;
+      if (beta[i].body_length + 1 > 128)
+        {
+          free (alpha);
+          free (beta);
+          return GLR_REWRITE_STATUS_UNSUPPORTED;
+        }
+
+      body[body_length++] = prefix;
+      for (size_t j = 0; j < beta[i].body_length; j++)
+        {
+          body[body_length++] = beta[i].body[j];
+        }
+      if (glr_grammar_add_production (grammar, symbol->id, body, body_length)
+          < 0)
+        {
+          free (alpha);
+          free (beta);
+          return GLR_REWRITE_STATUS_MEMORY_ERROR;
+        }
+    }
+
+  for (size_t i = 0; i < alpha_count; i++)
+    {
+      glr_symbol_t *body[128];
+      size_t body_length = 0;
+
+      if (alpha[i].body_length > 128)
+        {
+          free (alpha);
+          free (beta);
+          return GLR_REWRITE_STATUS_UNSUPPORTED;
+        }
+
+      body[body_length++] = prefix;
+      for (size_t j = 0; j + 1 < alpha[i].body_length; j++)
+        {
+          body[body_length++] = alpha[i].body[j];
+        }
+      if (glr_grammar_add_production (grammar, prefix->id, body, body_length)
+          < 0)
+        {
+          free (alpha);
+          free (beta);
+          return GLR_REWRITE_STATUS_MEMORY_ERROR;
+        }
+    }
+
+  if (glr_grammar_add_production (grammar, prefix->id, NULL, 0) < 0)
+    {
+      free (alpha);
+      free (beta);
+      return GLR_REWRITE_STATUS_MEMORY_ERROR;
+    }
+
+  free (alpha);
+  free (beta);
+  return GLR_REWRITE_STATUS_OK;
+}
+
+glr_rewrite_status_t
+glr_rewrite_remove_right_recursion (glr_grammar_t *grammar)
+{
+  size_t generated_count = 0;
+  size_t n;
+
+  if (grammar == NULL)
+    {
+      return GLR_REWRITE_STATUS_INVALID_ARGUMENT;
+    }
+
+  /* Mirror image of the left-recursion pass: scan the original nonterminals
+     from last to first and substitute later symbols into earlier ones. */
+  n = grammar->symbol_count;
+  for (size_t i = n; i > 0; i--)
+    {
+      glr_symbol_t *ai = grammar->symbols[i - 1];
+      if (ai->type != GLR_SYMBOL_NONTERMINAL)
+        {
+          continue;
+        }
+
+      for (size_t j = n; j > i; j--)
+        {
+          glr_symbol_t *aj = grammar->symbols[j - 1];
+          if (aj->type != GLR_SYMBOL_NONTERMINAL)
+            {
+              continue;
+            }
+          if (glr_rewrite_expand_indirect_right_recursion (grammar, ai, aj)
+              != GLR_REWRITE_STATUS_OK)
+            {
+              return GLR_REWRITE_STATUS_MEMORY_ERROR;
+            }
+        }
+
+      if (glr_rewrite_eliminate_direct_right_recursion (grammar, ai,
+                                                        generated_count++)
+          != GLR_REWRITE_STATUS_OK)
+        {
+          return GLR_REWRITE_STATUS_MEMORY_ERROR;
+        }
+    }
+
+  return GLR_REWRITE_STATUS_OK;
+}
+
+glr_rewrite_status_t
+glr_rewrite_reverse_productions (glr_grammar_t *grammar)
+{
+  size_t i;
+
+  if (grammar == NULL)
+    {
+      return GLR_REWRITE_STATUS_INVALID_ARGUMENT;
+    }
+
+  for (i = 0; i < grammar->production_count; i++)
+    {
+      glr_production_t *production = grammar->productions[i];
+      size_t left = 0;
+      size_t right = production->body_length;
+      while (left < right)
+        {
+          glr_symbol_t *symbol;
+          right--;
+          if (left >= right)
+            {
+              break;
+            }
+          symbol = production->body[left];
+          production->body[left] = production->body[right];
+          production->body[right] = symbol;
+          if (production->aliases != NULL)
+            {
+              const char *alias = production->aliases[left];
+              production->aliases[left] = production->aliases[right];
+              production->aliases[right] = alias;
+            }
+          left++;
+        }
+    }
+
+  return GLR_REWRITE_STATUS_OK;
+}
+
+glr_rewrite_status_t
+glr_rewrite_inline_single_production_nonterminals (glr_grammar_t *grammar)
+{
+  if (grammar == NULL)
+    {
+      return GLR_REWRITE_STATUS_INVALID_ARGUMENT;
+    }
+
+  while (true)
+    {
+      glr_symbol_t *candidate = NULL;
+      glr_production_t *definition = NULL;
+      glr_symbol_t *expansion[128];
+      size_t expansion_length = 0;
+
+      for (size_t s = 0; s < grammar->symbol_count; s++)
+        {
+          glr_symbol_t *symbol = grammar->symbols[s];
+          glr_production_t *found = NULL;
+          size_t count = 0;
+          bool self_referential = false;
+          bool usable = true;
+
+          if (symbol->type != GLR_SYMBOL_NONTERMINAL
+              || symbol == grammar->start_symbol)
+            {
+              continue;
+            }
+
+          for (size_t i = 0; i < grammar->production_count; i++)
+            {
+              if (grammar->productions[i]->head == symbol)
+                {
+                  count++;
+                  found = grammar->productions[i];
+                }
+            }
+          if (count != 1 || glr_rewrite_production_has_metadata (found))
+            {
+              continue;
+            }
+
+          for (size_t j = 0; j < found->body_length; j++)
+            {
+              if (found->body[j] == symbol)
+                {
+                  self_referential = true;
+                  break;
+                }
+            }
+          if (self_referential || found->body_length > 128)
+            {
+              continue;
+            }
+
+          /* Uses carrying per-position aliases cannot be spliced without
+             inventing alias mappings, so the definition is retained. */
+          for (size_t i = 0; i < grammar->production_count && usable; i++)
+            {
+              glr_production_t *use = grammar->productions[i];
+              size_t occurrences = 0;
+              if (use == found)
+                {
+                  continue;
+                }
+              for (size_t j = 0; j < use->body_length; j++)
+                {
+                  if (use->body[j] == symbol)
+                    {
+                      occurrences++;
+                    }
+                }
+              if (occurrences == 0)
+                {
+                  continue;
+                }
+              if (use->aliases != NULL)
+                {
+                  usable = false;
+                  break;
+                }
+              if (use->body_length + occurrences * found->body_length
+                  > 128 + occurrences)
+                {
+                  return GLR_REWRITE_STATUS_UNSUPPORTED;
+                }
+            }
+          if (!usable)
+            {
+              continue;
+            }
+
+          candidate = symbol;
+          definition = found;
+          expansion_length = found->body_length;
+          for (size_t j = 0; j < expansion_length; j++)
+            {
+              expansion[j] = found->body[j];
+            }
+          break;
+        }
+
+      if (candidate == NULL)
+        {
+          return GLR_REWRITE_STATUS_OK;
+        }
+
+      for (size_t i = 0; i < grammar->production_count; i++)
+        {
+          glr_production_t *use = grammar->productions[i];
+          size_t occurrences = 0;
+          glr_symbol_t **replacement;
+          size_t position = 0;
+
+          if (use == definition)
+            {
+              continue;
+            }
+          for (size_t j = 0; j < use->body_length; j++)
+            {
+              if (use->body[j] == candidate)
+                {
+                  occurrences++;
+                }
+            }
+          if (occurrences == 0)
+            {
+              continue;
+            }
+
+          replacement = calloc (
+              use->body_length + occurrences * expansion_length == 0
+                  ? 1
+                  : use->body_length + occurrences * expansion_length,
+              sizeof (*replacement));
+          if (replacement == NULL)
+            {
+              return GLR_REWRITE_STATUS_MEMORY_ERROR;
+            }
+          for (size_t j = 0; j < use->body_length; j++)
+            {
+              if (use->body[j] != candidate)
+                {
+                  replacement[position++] = use->body[j];
+                }
+              else
+                {
+                  for (size_t k = 0; k < expansion_length; k++)
+                    {
+                      replacement[position++] = expansion[k];
+                    }
+                }
+            }
+
+          free (use->body);
+          use->body = replacement;
+          use->body_length = position;
+        }
+
+      for (size_t i = 0; i < grammar->production_count; i++)
+        {
+          if (grammar->productions[i] == definition)
+            {
+              glr_rewrite_remove_production_at (grammar, i);
+              break;
+            }
+        }
+      for (size_t i = 0; i < grammar->symbol_count; i++)
+        {
+          if (grammar->symbols[i] == candidate)
+            {
+              glr_rewrite_remove_symbol_at (grammar, i);
+              break;
+            }
+        }
+    }
+}
+
+static bool
+glr_rewrite_nonterminals_structurally_equal (const glr_grammar_t *grammar,
+                                            const glr_symbol_t *a,
+                                            const glr_symbol_t *b)
+{
+  const glr_production_t *a_prods[256];
+  const glr_production_t *b_prods[256];
+  bool used[256];
+  size_t a_count = 0;
+  size_t b_count = 0;
+
+  if (grammar == NULL || a == NULL || b == NULL || a == b)
+    {
+      return false;
+    }
+
+  for (size_t i = 0; i < grammar->production_count; i++)
+    {
+      const glr_production_t *production = grammar->productions[i];
+      if (production->head == a)
+        {
+          if (a_count >= 256 || glr_rewrite_production_has_metadata (
+                                   (glr_production_t *) production))
+            {
+              return false;
+            }
+          a_prods[a_count++] = production;
+        }
+      else if (production->head == b)
+        {
+          if (b_count >= 256 || glr_rewrite_production_has_metadata (
+                                   (glr_production_t *) production))
+            {
+              return false;
+            }
+          b_prods[b_count++] = production;
+        }
+    }
+
+  if (a_count != b_count)
+    {
+      return false;
+    }
+
+  memset (used, 0, sizeof (used));
+  for (size_t i = 0; i < a_count; i++)
+    {
+      bool matched = false;
+      for (size_t j = 0; j < b_count; j++)
+        {
+          if (used[j])
+            {
+              continue;
+            }
+          if (a_prods[i]->body_length != b_prods[j]->body_length)
+            {
+              continue;
+            }
+          bool same = true;
+          for (size_t k = 0; k < a_prods[i]->body_length; k++)
+            {
+              if (a_prods[i]->body[k] != b_prods[j]->body[k])
+                {
+                  same = false;
+                  break;
+                }
+            }
+          if (same)
+            {
+              used[j] = true;
+              matched = true;
+              break;
+            }
+        }
+      if (!matched)
+        {
+          return false;
+        }
+    }
+
+  return true;
+}
+
+glr_rewrite_status_t
+glr_rewrite_merge_equivalent_nonterminals (glr_grammar_t *grammar)
+{
+  if (grammar == NULL)
+    {
+      return GLR_REWRITE_STATUS_INVALID_ARGUMENT;
+    }
+
+  while (true)
+    {
+      bool merged = false;
+
+      for (size_t x = 0; x < grammar->symbol_count && !merged; x++)
+        {
+          glr_symbol_t *first = grammar->symbols[x];
+          if (first->type != GLR_SYMBOL_NONTERMINAL)
+            {
+              continue;
+            }
+
+          for (size_t y = x + 1; y < grammar->symbol_count; y++)
+            {
+              glr_symbol_t *second = grammar->symbols[y];
+              glr_symbol_t *keep;
+              glr_symbol_t *drop;
+
+              if (second->type != GLR_SYMBOL_NONTERMINAL)
+                {
+                  continue;
+                }
+              if (!glr_rewrite_nonterminals_structurally_equal (grammar, first,
+                                                                second))
+                {
+                  continue;
+                }
+
+              /* Never remove the start symbol; fold the other one into it. */
+              if (first == grammar->start_symbol)
+                {
+                  keep = first;
+                  drop = second;
+                }
+              else if (second == grammar->start_symbol)
+                {
+                  keep = second;
+                  drop = first;
+                }
+              else
+                {
+                  keep = first;
+                  drop = second;
+                }
+
+              for (size_t i = 0; i < grammar->production_count; i++)
+                {
+                  glr_production_t *production = grammar->productions[i];
+                  for (size_t j = 0; j < production->body_length; j++)
+                    {
+                      if (production->body[j] == drop)
+                        {
+                          production->body[j] = keep;
+                        }
+                    }
+                }
+              for (size_t i = grammar->production_count; i > 0; i--)
+                {
+                  if (grammar->productions[i - 1]->head == drop)
+                    {
+                      glr_rewrite_remove_production_at (grammar, i - 1);
+                    }
+                }
+              for (size_t i = 0; i < grammar->symbol_count; i++)
+                {
+                  if (grammar->symbols[i] == drop)
+                    {
+                      glr_rewrite_remove_symbol_at (grammar, i);
+                      break;
+                    }
+                }
+
+              /* Duplicate productions may surface after the substitution. */
+              glr_rewrite_remove_duplicate_productions (grammar);
+              merged = true;
+              break;
+            }
+        }
+
+      if (!merged)
+        {
+          return GLR_REWRITE_STATUS_OK;
+        }
+    }
+}
+
+glr_rewrite_status_t
+glr_rewrite_chomsky_normal_form (glr_grammar_t *grammar)
+{
+  glr_rewrite_status_t status;
+
+  if (grammar == NULL || grammar->start_symbol == NULL)
+    {
+      return GLR_REWRITE_STATUS_INVALID_ARGUMENT;
+    }
+
+  /* A fresh start symbol keeps the start out of every right-hand side and
+     preserves an S -> epsilon production for nullable input languages. */
+  status = glr_rewrite_augment_start_symbol (grammar);
+  if (status != GLR_REWRITE_STATUS_OK)
+    {
+      return status;
+    }
+  status = glr_rewrite_remove_epsilon_productions (grammar);
+  if (status != GLR_REWRITE_STATUS_OK)
+    {
+      return status;
+    }
+  status = glr_rewrite_remove_unit_productions (grammar);
+  if (status != GLR_REWRITE_STATUS_OK)
+    {
+      return status;
+    }
+  status = glr_rewrite_isolate_terminals (grammar);
+  if (status != GLR_REWRITE_STATUS_OK)
+    {
+      return status;
+    }
+  status = glr_rewrite_left_binarize (grammar);
+  if (status != GLR_REWRITE_STATUS_OK)
+    {
+      return status;
+    }
+  return glr_rewrite_remove_useless_symbols (grammar);
 }

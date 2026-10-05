@@ -20,7 +20,22 @@
      GLR_REWRITE_RULE_REMOVE_LEFT_RECURSION,
      GLR_REWRITE_RULE_LEFT_FACTOR,
      GLR_REWRITE_RULE_MAKE_LR_COMPATIBLE,
-     GLR_REWRITE_RULE_ELIMINATE_AMBIGUITY
+     GLR_REWRITE_RULE_ELIMINATE_AMBIGUITY,
+     GLR_REWRITE_RULE_REMOVE_DUPLICATE_PRODUCTIONS,
+     GLR_REWRITE_RULE_REMOVE_SELF_UNIT_PRODUCTIONS,
+     GLR_REWRITE_RULE_REMOVE_UNREACHABLE_SYMBOLS,
+     GLR_REWRITE_RULE_REMOVE_UNPRODUCTIVE_SYMBOLS,
+     GLR_REWRITE_RULE_REMOVE_UNUSED_TERMINALS,
+     GLR_REWRITE_RULE_AUGMENT_START_SYMBOL,
+     GLR_REWRITE_RULE_ISOLATE_TERMINALS,
+     GLR_REWRITE_RULE_LEFT_BINARIZE,
+     GLR_REWRITE_RULE_RIGHT_BINARIZE,
+     GLR_REWRITE_RULE_CHOMSKY_NORMAL_FORM,
+     GLR_REWRITE_RULE_RIGHT_FACTOR,
+     GLR_REWRITE_RULE_REMOVE_RIGHT_RECURSION,
+     GLR_REWRITE_RULE_REVERSE_PRODUCTIONS,
+     GLR_REWRITE_RULE_INLINE_SINGLE_PRODUCTION_NONTERMINALS,
+     GLR_REWRITE_RULE_MERGE_EQUIVALENT_NONTERMINALS
  } glr_rewrite_rule_kind_t;
  
  typedef struct {
@@ -287,6 +302,11 @@
  
  - Grammar rewriting transforms grammars for efficiency and correctness
  - Standard rules: epsilon elimination, left recursion removal, left factoring
+ - Extended rules: duplicate/self-unit cleanup, reachability and productivity
+   filters, unused-terminal removal, start augmentation, terminal isolation,
+   left/right binarization, Chomsky normal form, right factoring, right
+   recursion removal, production reversal, single-production inlining, and
+   equivalent-nonterminal merging
  - GRL provides declarative rewrite language
  - Rewrite programs can be loaded from files or built programmatically
  - Pipelines apply multiple transformations in sequence

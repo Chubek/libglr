@@ -16,7 +16,8 @@
  *
  * GRL focuses on grammar normalization. The built-in rule kinds cover common
  * textbook rewrites such as epsilon elimination, unit-production elimination,
- * useless-symbol elimination, left-recursion removal, and left factoring.
+ * useless-symbol elimination, recursion removal, factoring, binarization,
+ * terminal isolation, and Chomsky normal form.
  * The API also exposes lower-level editing primitives so applications can mix
  * declarative and procedural rewrites in the same pipeline.
  */
@@ -49,7 +50,22 @@ extern "C"
     GLR_REWRITE_RULE_REMOVE_LEFT_RECURSION,
     GLR_REWRITE_RULE_LEFT_FACTOR,
     GLR_REWRITE_RULE_MAKE_LR_COMPATIBLE,
-    GLR_REWRITE_RULE_ELIMINATE_AMBIGUITY
+    GLR_REWRITE_RULE_ELIMINATE_AMBIGUITY,
+    GLR_REWRITE_RULE_REMOVE_DUPLICATE_PRODUCTIONS,
+    GLR_REWRITE_RULE_REMOVE_SELF_UNIT_PRODUCTIONS,
+    GLR_REWRITE_RULE_REMOVE_UNREACHABLE_SYMBOLS,
+    GLR_REWRITE_RULE_REMOVE_UNPRODUCTIVE_SYMBOLS,
+    GLR_REWRITE_RULE_REMOVE_UNUSED_TERMINALS,
+    GLR_REWRITE_RULE_AUGMENT_START_SYMBOL,
+    GLR_REWRITE_RULE_ISOLATE_TERMINALS,
+    GLR_REWRITE_RULE_LEFT_BINARIZE,
+    GLR_REWRITE_RULE_RIGHT_BINARIZE,
+    GLR_REWRITE_RULE_CHOMSKY_NORMAL_FORM,
+    GLR_REWRITE_RULE_RIGHT_FACTOR,
+    GLR_REWRITE_RULE_REMOVE_RIGHT_RECURSION,
+    GLR_REWRITE_RULE_REVERSE_PRODUCTIONS,
+    GLR_REWRITE_RULE_INLINE_SINGLE_PRODUCTION_NONTERMINALS,
+    GLR_REWRITE_RULE_MERGE_EQUIVALENT_NONTERMINALS
   } glr_rewrite_rule_kind_t;
 
   /**
@@ -289,6 +305,100 @@ extern "C"
    *       caller to guess.
    */
   glr_rewrite_status_t glr_rewrite_eliminate_ambiguity (
+       glr_grammar_t *grammar);
+
+  /** @ingroup rewrite_api
+   * @brief Remove repeated productions with identical bodies and metadata.
+   * Productions carrying semantic actions are retained.
+   */
+  glr_rewrite_status_t glr_rewrite_remove_duplicate_productions (
+      glr_grammar_t *grammar);
+
+  /** @ingroup rewrite_api
+   * @brief Remove identity productions of the form A -> A.
+   */
+  glr_rewrite_status_t glr_rewrite_remove_self_unit_productions (
+      glr_grammar_t *grammar);
+
+  /** @ingroup rewrite_api
+   * @brief Remove symbols and productions unreachable from the start symbol.
+   */
+  glr_rewrite_status_t glr_rewrite_remove_unreachable_symbols (
+      glr_grammar_t *grammar);
+
+  /** @ingroup rewrite_api
+   * @brief Remove nonterminals that cannot derive a terminal string.
+   * An unproductive start symbol is retained to represent the empty language.
+   */
+  glr_rewrite_status_t glr_rewrite_remove_unproductive_symbols (
+      glr_grammar_t *grammar);
+
+  /** @ingroup rewrite_api
+   * @brief Remove terminals not referenced by any production body.
+   */
+  glr_rewrite_status_t glr_rewrite_remove_unused_terminals (
+      glr_grammar_t *grammar);
+
+  /** @ingroup rewrite_api
+   * @brief Introduce a fresh start symbol S' with the production S' -> S.
+   */
+  glr_rewrite_status_t glr_rewrite_augment_start_symbol (
+      glr_grammar_t *grammar);
+
+  /** @ingroup rewrite_api
+   * @brief Replace terminals in bodies of length >= 2 with fresh wrappers.
+   * Each wrapper has one production T -> terminal and is shared per terminal.
+   */
+  glr_rewrite_status_t glr_rewrite_isolate_terminals (
+      glr_grammar_t *grammar);
+
+  /** @ingroup rewrite_api
+   * @brief Binarize long bodies with left-associated helper productions.
+   */
+  glr_rewrite_status_t glr_rewrite_left_binarize (glr_grammar_t *grammar);
+
+  /** @ingroup rewrite_api
+   * @brief Binarize long bodies with right-associated helper productions.
+   */
+  glr_rewrite_status_t glr_rewrite_right_binarize (glr_grammar_t *grammar);
+
+  /** @ingroup rewrite_api
+   * @brief Convert to A -> B C or A -> terminal, allowing S -> epsilon.
+   * The fresh start symbol never occurs in a production body.
+   */
+  glr_rewrite_status_t glr_rewrite_chomsky_normal_form (
+      glr_grammar_t *grammar);
+
+  /** @ingroup rewrite_api
+   * @brief Factor common suffixes into helper nonterminals.
+   */
+  glr_rewrite_status_t glr_rewrite_right_factor (glr_grammar_t *grammar);
+
+  /** @ingroup rewrite_api
+   * @brief Eliminate right recursion by mirrored ordered substitution.
+   */
+  glr_rewrite_status_t glr_rewrite_remove_right_recursion (
+      glr_grammar_t *grammar);
+
+  /** @ingroup rewrite_api
+   * @brief Reverse each production body, producing the reversed language.
+   * Body-position aliases are reversed along with the symbols.
+   */
+  glr_rewrite_status_t glr_rewrite_reverse_productions (
+      glr_grammar_t *grammar);
+
+  /** @ingroup rewrite_api
+   * @brief Inline non-start, nonrecursive nonterminals with one production.
+   * Definitions with production metadata are retained.
+   */
+  glr_rewrite_status_t glr_rewrite_inline_single_production_nonterminals (
+      glr_grammar_t *grammar);
+
+  /** @ingroup rewrite_api
+   * @brief Merge nonterminals with identical production sets to a fixed point.
+   * This tests structural equality, not general language equivalence.
+   */
+  glr_rewrite_status_t glr_rewrite_merge_equivalent_nonterminals (
       glr_grammar_t *grammar);
 
 #ifdef __cplusplus
