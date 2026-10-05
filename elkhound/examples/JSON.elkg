@@ -1,5 +1,106 @@
 JGRM = elkg.grammar.new "JSON"
-{  
-  uses = {elkg.patterns.cstring, elkg.patterns.number},
-  lexer = elkg.lexer.pcre2,
+
+JGRM:Meta
+{
+    language = {
+        name = "JSON",
+        type = "Data Exchange",
+        standard = "www.json.org",
+    },
+
+    grammar = {
+        author = "Chubak Bidpaa <chubakbidpaa@riseup.net>",
+        license = "MIT",
+    },
+
+    uses = {
+        elkg.patterns.cstring,
+        elkg.patterns.number,
+        elkg.disamb.reject,
+    },
+
+    lexer = {
+        main = elkg.lexer.PCRE2,
+        fallback = elkg.lexer.SCANNERLESS,
+    },
+
+    encoding = elkg.encoding.UTF8,
+
+    revhist = {
+        "05-Oct-2026: First revision",
+    },
 }
+
+---------------------------------------------------------------------
+-- Lexemes
+---------------------------------------------------------------------
+JGRM.Lexeme:Define
+{
+    STRING = elkg.patterns.cstring,
+    NUMBER = elkg.patterns.number,
+    TRUE   = elkg.lexeme.keyword("true"),
+    FALSE  = elkg.lexeme.keyword("false"),
+    NULL   = elkg.lexeme.keyword("null"),
+
+    -- Punctuation
+    LBRACE   = elkg.lexeme.literal("{"),
+    RBRACE   = elkg.lexeme.literal("}"),
+    LBRACKET = elkg.lexeme.literal("["),
+    RBRACKET = elkg.lexeme.literal("]"),
+    COMMA    = elkg.lexeme.literal(","),
+    COLON    = elkg.lexeme.literal(":"),
+}
+
+-- Insignificant whitespace (RFC 8259: space, \t, \n, \r)
+JGRM.Lexeme:Skip
+{
+    WS = elkg.lexeme.pattern("[ \\t\\r\\n]+"),
+}
+
+---------------------------------------------------------------------
+-- Rules
+---------------------------------------------------------------------
+JGRM.Rule:Define
+{
+    Json = { { "Value" } },
+
+    Value = {
+        { "Object" },
+        { "Array"  },
+        { "STRING" },
+        { "NUMBER" },
+        { "TRUE"   },
+        { "FALSE"  },
+        { "NULL"   },
+    },
+
+    -- object = '{' [ member (',' member)* ] '}'
+    Object = {
+        { "LBRACE", "RBRACE" },
+        { "LBRACE", "Members", "RBRACE" },
+    },
+
+    Members = {
+        { "Member" },
+        { "Members", "COMMA", "Member" },
+    },
+
+    Member = {
+        { "STRING", "COLON", "Value" },
+    },
+
+    -- array = '[' [ value (',' value)* ] ']'
+    Array = {
+        { "LBRACKET", "RBRACKET" },
+        { "LBRACKET", "Elements", "RBRACKET" },
+    },
+
+    Elements = {
+        { "Value" },
+        { "Elements", "COMMA", "Value" },
+    },
+}
+
+JGRM:Start "Json"
+
+return JGRM
