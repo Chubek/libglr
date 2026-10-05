@@ -44,6 +44,11 @@ glr_disambig_hook_create (const char *name, unsigned int priority,
     }
 
   hook->name = glr_disambig_strdup (name);
+  if (name != NULL && hook->name == NULL)
+    {
+      free (hook);
+      return NULL;
+    }
   hook->priority = priority;
   hook->fn = fn;
   hook->destroy = destroy;

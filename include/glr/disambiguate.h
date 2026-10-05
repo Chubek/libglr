@@ -79,7 +79,7 @@ extern "C"
     int precedence;              ///< Static or dynamic precedence
     glr_disambig_associativity_t associativity; ///< Associativity class
     double score;                ///< Generic additive score
-    double probability;          ///< Generic multiplicative probability
+    double probability;          ///< Probability in [0,1]; use 1 for neutral
     void *semantic_value;        ///< Semantic payload, if any
     void *user_data;             ///< Caller-owned candidate data
     bool rejected;               ///< Hook-maintained elimination flag

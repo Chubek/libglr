@@ -114,7 +114,9 @@ glr_disambig_precedence_hook_create (const char *name,
   state->destroy = destroy;
   state->user_data = user_data;
 
-  return glr_disambig_hook_create (
+  glr_disambig_hook_t *hook = glr_disambig_hook_create (
       name != NULL ? name : "precedence", priority, glr_precedence_hook, state,
       glr_precedence_state_destroy);
+  if (hook == NULL) free (state);
+  return hook;
 }

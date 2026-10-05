@@ -334,6 +334,7 @@ install(EXPORT ${PROJECT_NAME}-exports
 )
 
 if(BUILD_DISAMBSTD)
+    enable_language(CXX)
     add_subdirectory(disambstd)
 endif()
 

@@ -86,7 +86,9 @@ glr_disambig_semantic_hook_create (const char *name, unsigned int priority,
   state->destroy = destroy;
   state->user_data = user_data;
 
-  return glr_disambig_hook_create (
+  glr_disambig_hook_t *hook = glr_disambig_hook_create (
       name != NULL ? name : "semantic", priority, glr_semantic_hook, state,
       glr_semantic_state_destroy);
+  if (hook == NULL) free (state);
+  return hook;
 }

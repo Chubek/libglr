@@ -32,7 +32,6 @@ glr_predicate_hook (glr_disambig_context_t *context, size_t *winner_index,
 {
   glr_predicate_state_t *state = user_data;
   size_t i;
-  bool changed = false;
 
   for (i = 0; i < context->candidate_count; i++)
     {
@@ -44,7 +43,6 @@ glr_predicate_hook (glr_disambig_context_t *context, size_t *winner_index,
       if (!state->fn (context, &context->candidates[i], state->user_data))
         {
           glr_disambig_context_reject_candidate (context, i);
-          changed = true;
         }
     }
 
@@ -62,7 +60,7 @@ glr_predicate_hook (glr_disambig_context_t *context, size_t *winner_index,
       return GLR_DISAMBIG_RESOLVED;
     }
 
-  return changed ? GLR_DISAMBIG_NO_MATCH : GLR_DISAMBIG_NO_MATCH;
+  return GLR_DISAMBIG_NO_MATCH;
 }
 
 glr_disambig_hook_t *
@@ -88,7 +86,9 @@ glr_disambig_predicate_hook_create (const char *name, unsigned int priority,
   state->destroy = destroy;
   state->user_data = user_data;
 
-  return glr_disambig_hook_create (
+  glr_disambig_hook_t *hook = glr_disambig_hook_create (
       name != NULL ? name : "predicate", priority, glr_predicate_hook, state,
       glr_predicate_state_destroy);
+  if (hook == NULL) free (state);
+  return hook;
 }

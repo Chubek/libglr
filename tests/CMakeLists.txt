@@ -60,6 +60,10 @@ glr_add_test(test_ambiguity
     LABELS "unit;integration;legacy")
 
 if(TARGET glrdisambstd)
+    glr_add_test(test_disambstd
+        SOURCES test_disambstd.c
+        LIBRARIES glrdisambstd
+        LABELS "unit;integration;disambiguation")
     target_link_libraries(test_ambiguity PRIVATE glrdisambstd)
     glr_add_test(test_disambiguate
         SOURCES test_disambiguate.c
@@ -89,7 +93,7 @@ add_custom_target(check
     USES_TERMINAL)
 
 if(TARGET test_disambiguate)
-    add_dependencies(check test_disambiguate)
+    add_dependencies(check test_disambiguate test_disambstd)
 endif()
 
 add_custom_target(check-verbose

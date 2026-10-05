@@ -61,6 +61,7 @@ glr_associativity_hook (glr_disambig_context_t *context, size_t *winner_index,
   glr_associativity_state_t *state = user_data;
   size_t best_index = SIZE_MAX;
   glr_disambig_associativity_t mode = GLR_DISAMBIG_ASSOC_NONE;
+  glr_disambig_associativity_t common_mode = GLR_DISAMBIG_ASSOC_NONE;
   int best_precedence = 0;
   bool have_precedence = false;
   size_t i;
@@ -107,8 +108,12 @@ glr_associativity_hook (glr_disambig_context_t *context, size_t *winner_index,
       mode = glr_associativity_value (context, candidate, state);
       if (!candidate->has_split_position || mode == GLR_DISAMBIG_ASSOC_NONE)
         {
-          continue;
+          return GLR_DISAMBIG_NO_MATCH;
         }
+
+      if (common_mode != GLR_DISAMBIG_ASSOC_NONE && mode != common_mode)
+        return GLR_DISAMBIG_NO_MATCH;
+      common_mode = mode;
 
       if (mode == GLR_DISAMBIG_ASSOC_NONASSOC)
         {
@@ -140,7 +145,16 @@ glr_associativity_hook (glr_disambig_context_t *context, size_t *winner_index,
       return GLR_DISAMBIG_NO_MATCH;
     }
 
-  glr_disambig_context_select_candidate (context, best_index);
+  /* Preserve equal splits for the next hook rather than choosing by order. */
+  for (i = 0; i < context->candidate_count; ++i)
+    if (glr_disambig_candidate_is_active (&context->candidates[i])
+        && (glr_associativity_precedence (context, &context->candidates[i], state)
+                != best_precedence
+            || context->candidates[i].split_position
+                != context->candidates[best_index].split_position))
+      glr_disambig_context_reject_candidate (context, i);
+  if (glr_disambig_context_active_count (context) != 1)
+    return GLR_DISAMBIG_NO_MATCH;
   if (winner_index != NULL)
     {
       *winner_index = best_index;
@@ -168,7 +182,9 @@ glr_disambig_associativity_hook_create (
   state->destroy = destroy;
   state->user_data = user_data;
 
-  return glr_disambig_hook_create (
+  glr_disambig_hook_t *hook = glr_disambig_hook_create (
       name != NULL ? name : "associativity", priority,
       glr_associativity_hook, state, glr_associativity_state_destroy);
+  if (hook == NULL) free (state);
+  return hook;
 }
