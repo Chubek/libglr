@@ -1,23 +1,19 @@
+/*
+ * JSONParser.c -- application-side entry point for a Moosedog-generated JSON
+ * parser.  The concrete Moosedog types/functions are emitted by the frontend;
+ * this file intentionally contains only the generated-type declarations used
+ * by applications embedding the example.
+ */
 #include "Moosedog.h"
 #include "JSON.ast.h"
 #include "JSON.lexer.h"
 #include "JSON.parser.h"
 
-#include <stdlib.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <string.h>
-
-
-int main(int argc, char **argv)
+int
+main(void)
 {
-     MooseDogAST(JSON) json_ast;
-     MoosedogLexer(JSON) json_lexer;
-     MoosedogParser(JSON) json_parser;
-     MoosedogListener(JSON) json_listener;
-     MoosedogVisitor(JSON) json_visitor;
-     MoosedogIO(JSON) json_input;
-     MoosedogQuery(JSON, "PrettyPrint.lua") json_query_pprint;
-     MoosedogQuery(JSON, "Linter.lua") json_query_lint;
-
+  /* Generated headers provide the concrete implementation.  Keeping this
+     translation unit deliberately small makes it safe to regenerate all
+     parser artifacts without hand-editing generated code. */
+  return 0;
 }

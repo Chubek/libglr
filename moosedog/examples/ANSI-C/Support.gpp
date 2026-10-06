@@ -1,0 +1,6 @@
+/* Minimal GPP support file for the ANSI-C Moosedog example. */
+#mode standard C
+#define STRINGIFY(x) #x
+#define CONCAT(a,b) a##b
+#define GRAMMAR_NAME "ANSI-C"
+#define GRAMMAR_VERSION "1.0.0"

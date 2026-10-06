@@ -192,7 +192,8 @@ copy_runtime_assets() {
     cp "$shared_lib" "$runtime_dir/"
   else
     warn "no built libglr shared/static library found under build/"
-\n  # Copy LMDB library if cache support is enabled
+
+  # Copy LMDB library if cache support is enabled
   lmdb_lib=$(find /usr/lib /usr/local/lib -maxdepth 2 -type f \( -name 'liblmdb.so*' -o -name 'liblmdb.dylib' -o -name 'liblmdb.a' \) 2>/dev/null | head -n 1 || true)
   if [[ -n "$lmdb_lib" ]]; then
     cp "$lmdb_lib" "$runtime_dir/" 2>/dev/null || warn "could not copy LMDB library"
@@ -214,7 +215,8 @@ This directory contains SWIG-generated low-level bindings for libglr.
 - Generated from `bindings/libglr.i`
 - Intended as a thin FFI layer for higher-level wrappers.
 - Helper accessors prefixed with `glr_binding_` smooth over C arrays and unions.
-\n## Cache API Support
+
+## Cache API Support
 If libglr was built with `ENABLE_CACHE=ON`, these bindings include the incremental parsing Cache API.
 This requires LMDB (Lightning Memory-Mapped Database) to be installed on the target system.
 - `Makefile` builds and installs the binding with the language toolchain when supported.
@@ -309,11 +311,16 @@ root = Path(__file__).resolve().parent
 runtime = root / "runtime"
 include_dirs = [str(runtime / "include")]
 library_dirs = [str(runtime)]
-libraries = ["libglr", "glr"]
+# CMake's libglr target is emitted as libglr.* (OUTPUT_NAME=glr). Older
+# builds may have emitted liblibglr.*, so select exactly one library name.
+libraries = []
+for name in ("glr", "libglr"):
+    if any((runtime / f"lib{name}{suffix}").exists()
+           for suffix in (".a", ".so", ".dylib")):
+        libraries = [name]
+        break
 extra_link_args = []
-
-if not any((runtime / f"lib{name}.a").exists() or (runtime / f"lib{name}.so").exists() or (runtime / f"{name}.dll").exists() for name in libraries):
-    libraries = []
+if not libraries:
     extra_link_args = [str(path) for path in runtime.glob("lib*.a")]
 
 setup(
@@ -596,13 +603,16 @@ generate_language() {
   fi
 
   log "generating $language bindings in $target_dir"
-  # Add cache support flag if LMDB is available
+  # Cache support is opt-in. Do not probe or warn about LMDB for ordinary
+  # binding generation, because the cache header is optional in libglr.
   local lmdb_flag=""
-  if command_exists pkg-config && pkg-config --exists lmdb 2>/dev/null; then
-    lmdb_flag="-DHAVE_LMDB"
-    log "  including Cache API bindings (LMDB detected)"
-  else
-    warn "  LMDB not detected; Cache API bindings will be excluded"
+  if [[ "$with_cache" == "1" ]]; then
+    if command_exists pkg-config && pkg-config --exists lmdb 2>/dev/null; then
+      lmdb_flag="-DHAVE_LMDB"
+      log "  including Cache API bindings (LMDB detected)"
+    else
+      warn "  LMDB not detected; Cache API bindings will be excluded"
+    fi
   fi
 
   if ! swig -I"$REPO_ROOT/include" -I"$REPO_ROOT/third_party" $lmdb_flag -o "$swig_output" \
@@ -731,7 +741,8 @@ done
 if ! command_exists swig; then
   fail "swig is required to generate bindings"
 fi
-\n# Check for LMDB if cache support is requested
+
+# Check for LMDB if cache support is requested
 if [[ "$with_cache" == "1" ]]; then
   if ! command_exists pkg-config || ! pkg-config --exists lmdb 2>/dev/null; then
     warn "LMDB not found; cache API bindings will be excluded"

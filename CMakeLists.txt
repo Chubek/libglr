@@ -131,6 +131,7 @@ set(GLR_SOURCES
     src/glr/semantic-action.c
     src/glr/stringpool.c
     src/glr/thread.c
+    src/glr/atn.c
     third_party/klib/kalloc.c
     third_party/klib/kthread.c
 )
@@ -296,6 +297,7 @@ install(FILES
     include/glr/semantic-action.h
     include/glr/stringpool.h
     include/glr/thread.h
+    include/glr/atn.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/glr
 )
 

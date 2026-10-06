@@ -1,10 +1,13 @@
-cmake_minimum_required(VERSION 4.2)
+cmake_minimum_required(VERSION 3.16)
 
 find_package(SWIG REQUIRED)
 include(UseSWIG)
 
 set(CMAKE_SWIG_OUTDIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
 set_source_files_properties(libglr.i PROPERTIES CPLUSPLUS OFF)
+
+set(CMAKE_SWIG_FLAGS -I${CMAKE_CURRENT_SOURCE_DIR}/../include)
+
 
 swig_add_library(libglr_swig
     TYPE MODULE

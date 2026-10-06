@@ -41,6 +41,7 @@ glr_add_test(test_query SOURCES test_query.c LABELS "unit;core;query")
 glr_add_test(test_scannerless SOURCES test_scannerless.c LABELS "unit;core;scannerless")
 glr_add_test(test_semantic_action SOURCES test_semantic_action.c LABELS "unit;core;semantic")
 glr_add_test(test_thread SOURCES test_thread.c LABELS "unit;core;thread")
+glr_add_test(test_atn SOURCES test_atn.c LABELS "unit;core;atn")
 
 # Stratified suite needs the same feature macros as the library so the
 # cache-backed cases compile in when the incremental cache is enabled.
@@ -89,6 +90,7 @@ add_custom_target(check
         test_scannerless
         test_semantic_action
         test_thread
+        test_atn
         test_ambiguity
     USES_TERMINAL)
 

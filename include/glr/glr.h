@@ -53,6 +53,7 @@
 #include "semantic-action.h"
 #include "stringpool.h"
 #include "thread.h"
+#include "atn.h"
 
 #ifdef __cplusplus
 extern "C"

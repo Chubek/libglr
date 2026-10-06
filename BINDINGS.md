@@ -37,6 +37,7 @@ The interface exports the public headers under `include/glr/`:
 - `glr_binding_graph_*()` helpers for nodes, edges, and degrees
 - `glr_binding_item_set_count()` and `glr_binding_item_set_item_at()`
 - `glr_binding_reader_token_name()`
+- `glr_binding_atn_state_count()`, `glr_binding_atn_transition_count()`, and `glr_binding_atn_transition_at()`
 - `glr_binding_parse_error_string()`, `glr_binding_rewrite_status_string()`,
   `glr_binding_disambig_result_string()`, and `glr_binding_reader_status_name()`
 - `glr_binding_rewrite_program_add_*()` helpers for building rewrite programs
@@ -47,7 +48,7 @@ field access is awkward or where unions are poorly represented.
 
 ## Generating Bindings
 
-Use `bindings/generate-bindings.sh`.
+Use `bindings/generate-bindings.sh`. The script is executable and validates the requested target against the local SWIG installation.
 
 Generate Python bindings in the repository root:
 

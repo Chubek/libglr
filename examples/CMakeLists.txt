@@ -16,7 +16,14 @@ target_link_libraries(live PRIVATE libglr)
 add_executable(query query.c)
 target_link_libraries(query PRIVATE libglr)
 
+# ATN construction and GLR integration examples
+add_executable(atn_nfa atn_nfa.c)
+target_link_libraries(atn_nfa PRIVATE libglr)
+
+add_executable(atn_glr atn_glr.c)
+target_link_libraries(atn_glr PRIVATE libglr)
+
 # Install examples
-install(TARGETS calc ambiguous live query
+install(TARGETS calc ambiguous live query atn_nfa atn_glr
     RUNTIME DESTINATION bin
 )

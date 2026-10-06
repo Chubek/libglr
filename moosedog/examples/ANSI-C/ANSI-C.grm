@@ -1,0 +1,202 @@
+/* ANSI-C Moosedog grammar: C90/C99/C11-family core syntax. */
+Entrypoint
+{
+  LanguageInfo { Name = "ANSI-C" Type = LanguageType("ProgrammingLanguage") Standard = URL("https://www.iso.org/standard/74528.html") }
+  GrammarInfo { Authors = { "Chubak Bidpaa <chubakbidpaa@riseup.net>" } License = GetLicense("MIT") RevisionHistory = { "v1.0.0-2026/10/06-Initial Moosedog grammar" } }
+  Config
+  {
+    MainLexer = "PCRE2"
+    FallbackLexer = "Scannerless"
+    UseATN = true
+    UseIncremental = false
+    UseCache = false
+    EmitASTListener = false
+    EmitASTVisitor = false
+    ErrorRecovery = true
+    MaxErrors = 20
+    RecoveryStrategy = RecoveryMode("PanicMode")
+    OutputEncoding = "UTF-8"
+    StrictUnicode = true
+  }
+  Optparse
+  {
+    Option("--output-dir") { Short = "-o" Type = Path Default = "." Description = "Directory for generated parser files." }
+    Option("--debug") { Short = "-d" Define = "ANSI_C_DEBUG" Type = Bool Default = false Description = "Enable generator diagnostics." }
+  }
+  Preprocess()
+  Rewrite()
+  CompileLexer()
+  CompileParser()
+  WriteFiles()
+}
+
+AST
+{
+  Node(CNode) { Tag = "c_node_t" Kind = Leaf Fields = {} }
+}
+
+Lexical
+{
+  Skip(Whitespace) { Pattern = "[ \\t\\r\\n]+" }
+  Skip(Comment) { Pattern = "(/\\*([^*]|\\*+[^*/])*\\*+/|//[^\\r\\n]*)" }
+  Token(IDENTIFIER) { Pattern = "[A-Za-z_][A-Za-z0-9_]*" }
+  Token(I_CONSTANT) { Pattern = "(0[xX][0-9A-Fa-f]+|0[0-7]*|[1-9][0-9]*)[uUlL]*" }
+  Token(F_CONSTANT) { Pattern = "([0-9]+\\.[0-9]*|\\.[0-9]+|[0-9]+([eE][+-]?[0-9]+))[fFlL]?" }
+  Token(CHAR_CONSTANT) { Pattern = "'(\\\\.|[^'\\\\\\n\\r])+'" }
+  Token(STRING_LITERAL) { Pattern = "\\\"(\\\\.|[^\\\"\\\\\\n\\r])*\\\"" }
+  Token(KW_AUTO) { Pattern = "auto" Literal = Yes }
+  Token(KW_BREAK) { Pattern = "break" Literal = Yes }
+  Token(KW_CASE) { Pattern = "case" Literal = Yes }
+  Token(KW_CHAR) { Pattern = "char" Literal = Yes }
+  Token(KW_CONST) { Pattern = "const" Literal = Yes }
+  Token(KW_CONTINUE) { Pattern = "continue" Literal = Yes }
+  Token(KW_DEFAULT) { Pattern = "default" Literal = Yes }
+  Token(KW_DO) { Pattern = "do" Literal = Yes }
+  Token(KW_DOUBLE) { Pattern = "double" Literal = Yes }
+  Token(KW_ELSE) { Pattern = "else" Literal = Yes }
+  Token(KW_ENUM) { Pattern = "enum" Literal = Yes }
+  Token(KW_EXTERN) { Pattern = "extern" Literal = Yes }
+  Token(KW_FLOAT) { Pattern = "float" Literal = Yes }
+  Token(KW_FOR) { Pattern = "for" Literal = Yes }
+  Token(KW_GOTO) { Pattern = "goto" Literal = Yes }
+  Token(KW_IF) { Pattern = "if" Literal = Yes }
+  Token(KW_INLINE) { Pattern = "inline" Literal = Yes }
+  Token(KW_INT) { Pattern = "int" Literal = Yes }
+  Token(KW_LONG) { Pattern = "long" Literal = Yes }
+  Token(KW_REGISTER) { Pattern = "register" Literal = Yes }
+  Token(KW_RESTRICT) { Pattern = "restrict" Literal = Yes }
+  Token(KW_RETURN) { Pattern = "return" Literal = Yes }
+  Token(KW_SHORT) { Pattern = "short" Literal = Yes }
+  Token(KW_SIGNED) { Pattern = "signed" Literal = Yes }
+  Token(KW_SIZEOF) { Pattern = "sizeof" Literal = Yes }
+  Token(KW_STATIC) { Pattern = "static" Literal = Yes }
+  Token(KW_STRUCT) { Pattern = "struct" Literal = Yes }
+  Token(KW_SWITCH) { Pattern = "switch" Literal = Yes }
+  Token(KW_TYPEDEF) { Pattern = "typedef" Literal = Yes }
+  Token(KW_UNION) { Pattern = "union" Literal = Yes }
+  Token(KW_UNSIGNED) { Pattern = "unsigned" Literal = Yes }
+  Token(KW_VOID) { Pattern = "void" Literal = Yes }
+  Token(KW_VOLATILE) { Pattern = "volatile" Literal = Yes }
+  Token(KW_WHILE) { Pattern = "while" Literal = Yes }
+  Token(KW__BOOL) { Pattern = "_Bool" Literal = Yes }
+  Token(KW__COMPLEX) { Pattern = "_Complex" Literal = Yes }
+  Token(KW__IMAGINARY) { Pattern = "_Imaginary" Literal = Yes }
+  Token(LBRACE) { Pattern = "{" Literal = Yes }
+  Token(RBRACE) { Pattern = "}" Literal = Yes }
+  Token(LPAREN) { Pattern = "(" Literal = Yes }
+  Token(RPAREN) { Pattern = ")" Literal = Yes }
+  Token(LBRACKET) { Pattern = "[" Literal = Yes }
+  Token(RBRACKET) { Pattern = "]" Literal = Yes }
+  Token(SEMICOLON) { Pattern = ";" Literal = Yes }
+  Token(COMMA) { Pattern = "," Literal = Yes }
+  Token(COLON) { Pattern = ":" Literal = Yes }
+  Token(DOT) { Pattern = "\\." Literal = Yes }
+  Token(ELLIPSIS) { Pattern = "\\.\\.\\." Literal = Yes }
+  Token(ARROW) { Pattern = "->" Literal = Yes }
+  Token(INC) { Pattern = "\\+\\+" Literal = Yes }
+  Token(DEC) { Pattern = "--" Literal = Yes }
+  Token(SHL) { Pattern = "<<" Literal = Yes }
+  Token(SHR) { Pattern = ">>" Literal = Yes }
+  Token(LE) { Pattern = "<=" Literal = Yes }
+  Token(GE) { Pattern = ">=" Literal = Yes }
+  Token(EQ) { Pattern = "==" Literal = Yes }
+  Token(NE) { Pattern = "!=" Literal = Yes }
+  Token(ANDAND) { Pattern = "&&" Literal = Yes }
+  Token(OROR) { Pattern = "\\|\\|" Literal = Yes }
+  Token(OR) { Pattern = "\|" Literal = Yes }
+  Token(PLUS) { Pattern = "\\+" Literal = Yes }
+  Token(MINUS) { Pattern = "-" Literal = Yes }
+  Token(STAR) { Pattern = "\\*" Literal = Yes }
+  Token(SLASH) { Pattern = "/" Literal = Yes }
+  Token(PERCENT) { Pattern = "%" Literal = Yes }
+  Token(ASSIGNMENT) { Pattern = "=" Literal = Yes }
+  Token(BANG) { Pattern = "!" Literal = Yes }
+  Token(TILDE) { Pattern = "~" Literal = Yes }
+  Token(AMP) { Pattern = "&" Literal = Yes }
+  Token(XOR) { Pattern = "\\^" Literal = Yes }
+  Token(LT) { Pattern = "<" Literal = Yes }
+  Token(GT) { Pattern = ">" Literal = Yes }
+  Token(QUESTION) { Pattern = "\\?" Literal = Yes }
+  Token(PLUS_ASSIGN) { Pattern = "\\+=" Literal = Yes }
+  Token(MINUS_ASSIGN) { Pattern = "-=" Literal = Yes }
+  Token(MUL_ASSIGN) { Pattern = "\\*=" Literal = Yes }
+  Token(DIV_ASSIGN) { Pattern = "/=" Literal = Yes }
+  Token(MOD_ASSIGN) { Pattern = "%=" Literal = Yes }
+  Token(AND_ASSIGN) { Pattern = "&=" Literal = Yes }
+  Token(XOR_ASSIGN) { Pattern = "\\^=" Literal = Yes }
+  Token(OR_ASSIGN) { Pattern = "\\|=" Literal = Yes }
+  Token(SHL_ASSIGN) { Pattern = "<<=" Literal = Yes }
+  Token(SHR_ASSIGN) { Pattern = ">>=" Literal = Yes }
+}
+
+Syntactic
+{
+  StartRule = "TranslationUnit"
+  Rule(TranslationUnit) -> CNode { Alt { Seq = "ExternalDeclaration" } Alt { Seq = "TranslationUnit ExternalDeclaration" } }
+  Rule(ExternalDeclaration) -> CNode { Alt { Seq = "FunctionDefinition" } Alt { Seq = "Declaration" } }
+  Rule(FunctionDefinition) -> CNode { Alt { Seq = "DeclarationSpecifiers Declarator CompoundStatement" } Alt { Seq = "Declarator CompoundStatement" } Alt { Seq = "DeclarationSpecifiers Declarator DeclarationList CompoundStatement" } }
+  Rule(Declaration) -> CNode { Alt { Seq = "DeclarationSpecifiers InitDeclaratorList SEMICOLON" } Alt { Seq = "DeclarationSpecifiers SEMICOLON" } }
+  Rule(DeclarationList) -> CNode { Alt { Seq = "Declaration" } Alt { Seq = "DeclarationList Declaration" } }
+  Rule(DeclarationSpecifiers) -> CNode { Alt { Seq = "StorageClassSpecifier" } Alt { Seq = "TypeSpecifier" } Alt { Seq = "TypeQualifier" } Alt { Seq = "FunctionSpecifier" } Alt { Seq = "DeclarationSpecifiers StorageClassSpecifier" } Alt { Seq = "DeclarationSpecifiers TypeSpecifier" } Alt { Seq = "DeclarationSpecifiers TypeQualifier" } Alt { Seq = "DeclarationSpecifiers FunctionSpecifier" } }
+  Rule(StorageClassSpecifier) -> CNode { Alt { Seq = "KW_TYPEDEF" } Alt { Seq = "KW_EXTERN" } Alt { Seq = "KW_STATIC" } Alt { Seq = "KW_AUTO" } Alt { Seq = "KW_REGISTER" } }
+  Rule(TypeSpecifier) -> CNode { Alt { Seq = "KW_VOID" } Alt { Seq = "KW_CHAR" } Alt { Seq = "KW_SHORT" } Alt { Seq = "KW_INT" } Alt { Seq = "KW_LONG" } Alt { Seq = "KW_FLOAT" } Alt { Seq = "KW_DOUBLE" } Alt { Seq = "KW_SIGNED" } Alt { Seq = "KW_UNSIGNED" } Alt { Seq = "KW__BOOL" } Alt { Seq = "KW__COMPLEX" } Alt { Seq = "KW__IMAGINARY" } Alt { Seq = "StructOrUnionSpecifier" } Alt { Seq = "EnumSpecifier" } Alt { Seq = "IDENTIFIER" } }
+  Rule(TypeQualifier) -> CNode { Alt { Seq = "KW_CONST" } Alt { Seq = "KW_RESTRICT" } Alt { Seq = "KW_VOLATILE" } }
+  Rule(FunctionSpecifier) -> CNode { Alt { Seq = "KW_INLINE" } }
+  Rule(StructOrUnionSpecifier) -> CNode { Alt { Seq = "StructOrUnion IDENTIFIER LBRACE StructDeclarationList RBRACE" } Alt { Seq = "StructOrUnion LBRACE StructDeclarationList RBRACE" } Alt { Seq = "StructOrUnion IDENTIFIER" } }
+  Rule(StructOrUnion) -> CNode { Alt { Seq = "KW_STRUCT" } Alt { Seq = "KW_UNION" } }
+  Rule(StructDeclarationList) -> CNode { Alt { Seq = "StructDeclaration" } Alt { Seq = "StructDeclarationList StructDeclaration" } }
+  Rule(StructDeclaration) -> CNode { Alt { Seq = "SpecifierQualifierList StructDeclaratorList SEMICOLON" } Alt { Seq = "SpecifierQualifierList SEMICOLON" } }
+  Rule(SpecifierQualifierList) -> CNode { Alt { Seq = "TypeSpecifier" } Alt { Seq = "TypeQualifier" } Alt { Seq = "SpecifierQualifierList TypeSpecifier" } Alt { Seq = "SpecifierQualifierList TypeQualifier" } }
+  Rule(StructDeclaratorList) -> CNode { Alt { Seq = "StructDeclarator" } Alt { Seq = "StructDeclaratorList COMMA StructDeclarator" } }
+  Rule(StructDeclarator) -> CNode { Alt { Seq = "Declarator" } Alt { Seq = "Declarator COLON ConstantExpression" } Alt { Seq = "COLON ConstantExpression" } }
+  Rule(EnumSpecifier) -> CNode { Alt { Seq = "KW_ENUM IDENTIFIER LBRACE EnumeratorList RBRACE" } Alt { Seq = "KW_ENUM LBRACE EnumeratorList RBRACE" } Alt { Seq = "KW_ENUM IDENTIFIER" } }
+  Rule(EnumeratorList) -> CNode { Alt { Seq = "Enumerator" } Alt { Seq = "EnumeratorList COMMA Enumerator" } Alt { Seq = "EnumeratorList COMMA" } }
+  Rule(Enumerator) -> CNode { Alt { Seq = "IDENTIFIER" } Alt { Seq = "IDENTIFIER ASSIGNMENT ConstantExpression" } }
+  Rule(InitDeclaratorList) -> CNode { Alt { Seq = "InitDeclarator" } Alt { Seq = "InitDeclaratorList COMMA InitDeclarator" } }
+  Rule(InitDeclarator) -> CNode { Alt { Seq = "Declarator" } Alt { Seq = "Declarator ASSIGNMENT Initializer" } }
+  Rule(Declarator) -> CNode { Alt { Seq = "Pointer DirectDeclarator" } Alt { Seq = "DirectDeclarator" } }
+  Rule(DirectDeclarator) -> CNode { Alt { Seq = "IDENTIFIER" } Alt { Seq = "LPAREN Declarator RPAREN" } Alt { Seq = "DirectDeclarator LBRACKET RBRACKET" } Alt { Seq = "DirectDeclarator LBRACKET AssignmentExpression RBRACKET" } Alt { Seq = "DirectDeclarator LBRACKET KW_STATIC AssignmentExpression RBRACKET" } Alt { Seq = "DirectDeclarator LPAREN RPAREN" } Alt { Seq = "DirectDeclarator LPAREN ParameterTypeList RPAREN" } Alt { Seq = "DirectDeclarator LPAREN IdentifierList RPAREN" } }
+  Rule(Pointer) -> CNode { Alt { Seq = "STAR" } Alt { Seq = "STAR TypeQualifierList" } Alt { Seq = "STAR Pointer" } Alt { Seq = "STAR TypeQualifierList Pointer" } }
+  Rule(TypeQualifierList) -> CNode { Alt { Seq = "TypeQualifier" } Alt { Seq = "TypeQualifierList TypeQualifier" } }
+  Rule(ParameterTypeList) -> CNode { Alt { Seq = "ParameterList" } Alt { Seq = "ParameterList COMMA ELLIPSIS" } }
+  Rule(ParameterList) -> CNode { Alt { Seq = "ParameterDeclaration" } Alt { Seq = "ParameterList COMMA ParameterDeclaration" } }
+  Rule(ParameterDeclaration) -> CNode { Alt { Seq = "DeclarationSpecifiers Declarator" } Alt { Seq = "DeclarationSpecifiers" } }
+  Rule(IdentifierList) -> CNode { Alt { Seq = "IDENTIFIER" } Alt { Seq = "IdentifierList COMMA IDENTIFIER" } }
+  Rule(Initializer) -> CNode { Alt { Seq = "AssignmentExpression" } Alt { Seq = "LBRACE InitializerList RBRACE" } Alt { Seq = "LBRACE InitializerList COMMA RBRACE" } }
+  Rule(InitializerList) -> CNode { Alt { Seq = "Initializer" } Alt { Seq = "Designation Initializer" } Alt { Seq = "InitializerList COMMA Initializer" } Alt { Seq = "InitializerList COMMA Designation Initializer" } }
+  Rule(Designation) -> CNode { Alt { Seq = "DesignatorList ASSIGNMENT" } }
+  Rule(DesignatorList) -> CNode { Alt { Seq = "Designator" } Alt { Seq = "DesignatorList Designator" } }
+  Rule(Designator) -> CNode { Alt { Seq = "LBRACKET ConstantExpression RBRACKET" } Alt { Seq = "DOT IDENTIFIER" } }
+  Rule(CompoundStatement) -> CNode { Alt { Seq = "LBRACE RBRACE" } Alt { Seq = "LBRACE BlockItemList RBRACE" } }
+  Rule(BlockItemList) -> CNode { Alt { Seq = "BlockItem" } Alt { Seq = "BlockItemList BlockItem" } }
+  Rule(BlockItem) -> CNode { Alt { Seq = "Declaration" } Alt { Seq = "Statement" } }
+  Rule(Statement) -> CNode { Alt { Seq = "LabeledStatement" } Alt { Seq = "CompoundStatement" } Alt { Seq = "ExpressionStatement" } Alt { Seq = "SelectionStatement" } Alt { Seq = "IterationStatement" } Alt { Seq = "JumpStatement" } }
+  Rule(LabeledStatement) -> CNode { Alt { Seq = "IDENTIFIER COLON Statement" } Alt { Seq = "KW_CASE ConstantExpression COLON Statement" } Alt { Seq = "KW_DEFAULT COLON Statement" } }
+  Rule(ExpressionStatement) -> CNode { Alt { Seq = "SEMICOLON" } Alt { Seq = "Expression SEMICOLON" } }
+  Rule(SelectionStatement) -> CNode { Alt { Seq = "KW_IF LPAREN Expression RPAREN Statement" } Alt { Seq = "KW_IF LPAREN Expression RPAREN Statement KW_ELSE Statement" } Alt { Seq = "KW_SWITCH LPAREN Expression RPAREN Statement" } }
+  Rule(IterationStatement) -> CNode { Alt { Seq = "KW_WHILE LPAREN Expression RPAREN Statement" } Alt { Seq = "KW_DO Statement KW_WHILE LPAREN Expression RPAREN SEMICOLON" } Alt { Seq = "KW_FOR LPAREN ExpressionStatement ExpressionStatement RPAREN Statement" } Alt { Seq = "KW_FOR LPAREN ExpressionStatement ExpressionStatement Expression RPAREN Statement" } Alt { Seq = "KW_FOR LPAREN Declaration ExpressionStatement RPAREN Statement" } Alt { Seq = "KW_FOR LPAREN Declaration ExpressionStatement Expression RPAREN Statement" } }
+  Rule(JumpStatement) -> CNode { Alt { Seq = "KW_GOTO IDENTIFIER SEMICOLON" } Alt { Seq = "KW_CONTINUE SEMICOLON" } Alt { Seq = "KW_BREAK SEMICOLON" } Alt { Seq = "KW_RETURN SEMICOLON" } Alt { Seq = "KW_RETURN Expression SEMICOLON" } }
+  Rule(Expression) -> CNode { Alt { Seq = "AssignmentExpression" } Alt { Seq = "Expression COMMA AssignmentExpression" } }
+  Rule(AssignmentExpression) -> CNode { Alt { Seq = "ConditionalExpression" } Alt { Seq = "UnaryExpression ASSIGNMENT AssignmentExpression" } Alt { Seq = "UnaryExpression PLUS_ASSIGN AssignmentExpression" } Alt { Seq = "UnaryExpression MINUS_ASSIGN AssignmentExpression" } Alt { Seq = "UnaryExpression MUL_ASSIGN AssignmentExpression" } Alt { Seq = "UnaryExpression DIV_ASSIGN AssignmentExpression" } Alt { Seq = "UnaryExpression MOD_ASSIGN AssignmentExpression" } Alt { Seq = "UnaryExpression SHL_ASSIGN AssignmentExpression" } Alt { Seq = "UnaryExpression SHR_ASSIGN AssignmentExpression" } Alt { Seq = "UnaryExpression AND_ASSIGN AssignmentExpression" } Alt { Seq = "UnaryExpression XOR_ASSIGN AssignmentExpression" } Alt { Seq = "UnaryExpression OR_ASSIGN AssignmentExpression" } }
+  Rule(ConditionalExpression) -> CNode { Alt { Seq = "LogicalOrExpression" } Alt { Seq = "LogicalOrExpression QUESTION Expression COLON ConditionalExpression" } }
+  Rule(LogicalOrExpression) -> CNode { Alt { Seq = "LogicalAndExpression" } Alt { Seq = "LogicalOrExpression OROR LogicalAndExpression" } }
+  Rule(LogicalAndExpression) -> CNode { Alt { Seq = "InclusiveOrExpression" } Alt { Seq = "LogicalAndExpression ANDAND InclusiveOrExpression" } }
+  Rule(InclusiveOrExpression) -> CNode { Alt { Seq = "ExclusiveOrExpression" } Alt { Seq = "InclusiveOrExpression OR ExclusiveOrExpression" } }
+  Rule(ExclusiveOrExpression) -> CNode { Alt { Seq = "ExclusiveOrExpression XOR AndExpression" } Alt { Seq = "AndExpression" } }
+  Rule(AndExpression) -> CNode { Alt { Seq = "EqualityExpression" } Alt { Seq = "AndExpression AMP EqualityExpression" } }
+  Rule(EqualityExpression) -> CNode { Alt { Seq = "RelationalExpression" } Alt { Seq = "EqualityExpression EQ RelationalExpression" } Alt { Seq = "EqualityExpression NE RelationalExpression" } }
+  Rule(RelationalExpression) -> CNode { Alt { Seq = "ShiftExpression" } Alt { Seq = "RelationalExpression LE ShiftExpression" } Alt { Seq = "RelationalExpression GE ShiftExpression" } Alt { Seq = "RelationalExpression LT ShiftExpression" } Alt { Seq = "RelationalExpression GT ShiftExpression" } }
+  Rule(ShiftExpression) -> CNode { Alt { Seq = "AdditiveExpression" } Alt { Seq = "ShiftExpression SHL AdditiveExpression" } Alt { Seq = "ShiftExpression SHR AdditiveExpression" } }
+  Rule(AdditiveExpression) -> CNode { Alt { Seq = "MultiplicativeExpression" } Alt { Seq = "AdditiveExpression PLUS MultiplicativeExpression" } Alt { Seq = "AdditiveExpression MINUS MultiplicativeExpression" } }
+  Rule(MultiplicativeExpression) -> CNode { Alt { Seq = "CastExpression" } Alt { Seq = "MultiplicativeExpression STAR CastExpression" } Alt { Seq = "MultiplicativeExpression SLASH CastExpression" } Alt { Seq = "MultiplicativeExpression PERCENT CastExpression" } }
+  Rule(CastExpression) -> CNode { Alt { Seq = "UnaryExpression" } Alt { Seq = "LPAREN TypeName RPAREN CastExpression" } }
+  Rule(UnaryExpression) -> CNode { Alt { Seq = "PostfixExpression" } Alt { Seq = "INC UnaryExpression" } Alt { Seq = "DEC UnaryExpression" } Alt { Seq = "UnaryOperator CastExpression" } Alt { Seq = "KW_SIZEOF UnaryExpression" } Alt { Seq = "KW_SIZEOF LPAREN TypeName RPAREN" } }
+  Rule(UnaryOperator) -> CNode { Alt { Seq = "PLUS" } Alt { Seq = "MINUS" } Alt { Seq = "BANG" } Alt { Seq = "TILDE" } Alt { Seq = "AMP" } Alt { Seq = "STAR" } }
+  Rule(PostfixExpression) -> CNode { Alt { Seq = "PrimaryExpression" } Alt { Seq = "PostfixExpression LBRACKET Expression RBRACKET" } Alt { Seq = "PostfixExpression LPAREN RPAREN" } Alt { Seq = "PostfixExpression LPAREN ArgumentExpressionList RPAREN" } Alt { Seq = "PostfixExpression DOT IDENTIFIER" } Alt { Seq = "PostfixExpression ARROW IDENTIFIER" } Alt { Seq = "PostfixExpression INC" } Alt { Seq = "PostfixExpression DEC" } }
+  Rule(ArgumentExpressionList) -> CNode { Alt { Seq = "AssignmentExpression" } Alt { Seq = "ArgumentExpressionList COMMA AssignmentExpression" } }
+  Rule(PrimaryExpression) -> CNode { Alt { Seq = "IDENTIFIER" } Alt { Seq = "I_CONSTANT" } Alt { Seq = "F_CONSTANT" } Alt { Seq = "CHAR_CONSTANT" } Alt { Seq = "STRING_LITERAL" } Alt { Seq = "LPAREN Expression RPAREN" } }
+  Rule(ConstantExpression) -> CNode { Alt { Seq = "ConditionalExpression" } }
+  Rule(TypeName) -> CNode { Alt { Seq = "SpecifierQualifierList" } Alt { Seq = "SpecifierQualifierList AbstractDeclarator" } }
+  Rule(AbstractDeclarator) -> CNode { Alt { Seq = "Pointer" } Alt { Seq = "DirectAbstractDeclarator" } Alt { Seq = "Pointer DirectAbstractDeclarator" } }
+  Rule(DirectAbstractDeclarator) -> CNode { Alt { Seq = "LPAREN AbstractDeclarator RPAREN" } Alt { Seq = "LBRACKET RBRACKET" } Alt { Seq = "LBRACKET AssignmentExpression RBRACKET" } Alt { Seq = "LPAREN RPAREN" } Alt { Seq = "LPAREN ParameterTypeList RPAREN" } Alt { Seq = "DirectAbstractDeclarator LBRACKET RBRACKET" } Alt { Seq = "DirectAbstractDeclarator LBRACKET AssignmentExpression RBRACKET" } Alt { Seq = "DirectAbstractDeclarator LPAREN RPAREN" } Alt { Seq = "DirectAbstractDeclarator LPAREN ParameterTypeList RPAREN" } }
+}

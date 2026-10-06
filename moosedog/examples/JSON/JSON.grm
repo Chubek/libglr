@@ -36,7 +36,7 @@ Entrypoint
 
    Queries =
    {
-	"PrettyPrinter.lua",
+	"PrettyPrint.lua",
 	"Linter.lua"
    }
 
@@ -44,10 +44,10 @@ Entrypoint
    {
         MainLexer        = "PCRE2"
         FallbackLexer    = "Scannerless"
- 	UseATN	         = false
+ 	UseATN	         = true
         UseIncremental   = false
         UseCache         = true
-        CacheDirectory   = Tmpdir("MoosedogCache.XXXX")
+        CacheDirectory   = "${TMPDIR}/MoosedogCache"
 	MainAllocator    = Allocators("MemTkX")
 	FallbackAllocator= Allocators("mimalloc")
 
@@ -84,7 +84,7 @@ Entrypoint
 	    Short       = "-H"
 	    Define      = "JSON_PREPROCESSOR"
 	    Type        = String
-	    Default     = "${MOOSEDOG_SPEC_DIR}/JSON.gpp"
+	    Default     = "${MOOSEDOG_SPEC_DIR}/Support.gpp"
 	    Description = "Alternative preprocessor"
 	}
 

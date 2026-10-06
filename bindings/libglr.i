@@ -16,6 +16,13 @@
 #endif
 #include <glr/rewrite.h>
 #include <glr/stack.h>
+#include <glr/atn.h>
+#include <glr/thread.h>
+#include <glr/stringpool.h>
+#include <glr/semantic-action.h>
+#include <glr/select.h>
+#include <glr/scannerless.h>
+#include <glr/parsetbl.h>
 %}
 
 %include <stdint.i>
@@ -62,7 +69,7 @@ using System.Runtime.InteropServices;
 %ignore glr_graph_node_t::edges_in;
 %ignore glr_graph_t::nodes;
 %ignore glr_graph_t::edges;
-%ignore glr_graph_edge_t::from;
+%rename(from_node) glr_graph_edge_t::from;
 %ignore glr_graph_edge_t::to;
 %ignore glr_item_set_t::items;
 %ignore glr_parser::stacks;
@@ -96,6 +103,38 @@ using System.Runtime.InteropServices;
 %newobject glr_disambig_dynamic_programming_hook_create;
 %newobject glr_disambig_probability_hook_create;
 %newobject glr_disambig_predicate_hook_create;
+
+
+%inline %{
+static size_t glr_binding_atn_state_count(const glr_atn_t *atn)
+{
+  return glr_atn_state_count(atn);
+}
+
+static size_t glr_binding_atn_transition_count(const glr_atn_t *atn,
+                                               uint32_t state)
+{
+  const glr_atn_state_t *s = glr_atn_state(atn, state);
+  return s != NULL ? s->transition_count : 0;
+}
+
+static glr_atn_transition_t glr_binding_atn_transition_at(const glr_atn_t *atn,
+                                                         uint32_t state,
+                                                         size_t index)
+{
+  glr_atn_transition_t empty = { GLR_ATN_EPSILON, UINT32_MAX, -1 };
+  const glr_atn_state_t *s = glr_atn_state(atn, state);
+  if (s == NULL || index >= s->transition_count)
+    return empty;
+  return s->transitions[index];
+}
+
+static int glr_binding_atn_match_from(const glr_atn_t *atn, uint32_t state,
+                                      const int *symbols, size_t count)
+{
+  return glr_atn_match_from(atn, state, symbols, count);
+}
+%}
 
 %inline %{
 static const char *
@@ -479,6 +518,12 @@ glr_binding_cache_stats_hit_rate (const glr_cache_stats_t *stats)
 %include "glr/live-parsing.h"
 %include "glr/query.h"
 %include "glr/glr.h"
+%include "glr/atn.h"
+%include "glr/thread.h"
+%include "glr/stringpool.h"
+%include "glr/semantic-action.h"
+%include "glr/select.h"
+%include "glr/scannerless.h"
 
 #ifdef HAVE_LMDB
 /* Cache API - only available when LMDB is enabled */
