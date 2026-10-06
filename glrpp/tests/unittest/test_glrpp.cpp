@@ -309,3 +309,23 @@ TEST_CASE("production builder precedence") { auto grammar = make_single_token_gr
 TEST_CASE("disambiguator precedence exists") { auto hook = glrpp::disambiguators::by_precedence(); REQUIRE(hook.release() != nullptr); }
 TEST_CASE("disambiguator associativity exists") { auto hook = glrpp::disambiguators::by_associativity(); REQUIRE(hook.release() != nullptr); }
 TEST_CASE("disambiguator longest match exists") { auto hook = glrpp::disambiguators::longest_match(); REQUIRE(hook.release() != nullptr); }
+
+static glrpp::Grammar make_predict_grammar() {
+  glrpp::Grammar g;
+  auto s = g.nonterminal("S"); auto x = g.nonterminal("X");
+  auto a = g.terminal("a"); auto b = g.terminal("b"); auto c = g.terminal("c");
+  g.add_production(s, {x}); g.add_production(x, {a, b}); g.add_production(x, {a, c});
+  g.set_start(s); return g;
+}
+
+TEST_CASE("atn builds from grammar") { auto g = make_predict_grammar(); auto atn = glrpp::Atn::from_grammar(g); REQUIRE(atn.state_count() > 0); REQUIRE(atn.start_state() == 0); }
+TEST_CASE("atn rule and production starts") { auto g = make_predict_grammar(); auto atn = glrpp::Atn::from_grammar(g); auto x = g.nonterminal("X"); REQUIRE(atn.rule_start(x.id()) != UINT32_MAX); REQUIRE(atn.production_start(1) != UINT32_MAX); REQUIRE(atn.production_start(99) == UINT32_MAX); }
+TEST_CASE("atn match") { auto g = make_predict_grammar(); auto atn = glrpp::Atn::from_grammar(g); auto a = g.terminal("a"); auto b = g.terminal("b"); REQUIRE(atn.match({a.id(), b.id()}) == 1); }
+TEST_CASE("atn viable prefix") { auto g = make_predict_grammar(); auto atn = glrpp::Atn::from_grammar(g); auto x = g.nonterminal("X"); auto a = g.terminal("a"); auto b = g.terminal("b"); REQUIRE(atn.viable_prefix({a.id(), b.id()}, atn.rule_start(x.id())) == 2); }
+TEST_CASE("atn predicts alternative") { auto g = make_predict_grammar(); auto atn = glrpp::Atn::from_grammar(g); auto x = g.nonterminal("X"); auto a = g.terminal("a"); auto b = g.terminal("b"); auto out = atn.predict(g, x.id(), {a.id(), b.id()}); REQUIRE(out.is_ok()); REQUIRE(out.unwrap() == 1); }
+TEST_CASE("atn prediction tie is undecided") { auto g = make_predict_grammar(); auto atn = glrpp::Atn::from_grammar(g); auto x = g.nonterminal("X"); auto a = g.terminal("a"); REQUIRE(atn.predict(g, x.id(), {a.id()}).is_err()); }
+TEST_CASE("parser adaptive lookahead defaults off") { auto g = make_predict_grammar(); glrpp::Parser p(g); REQUIRE_FALSE(p.adaptive_lookahead_enabled()); REQUIRE(p.adaptive_depth() == GLR_ATN_LOOKAHEAD_DEFAULT_DEPTH); }
+TEST_CASE("parser adaptive lookahead enable and parse") { auto g = make_predict_grammar(); glrpp::Parser p(g); REQUIRE(p.enable_adaptive_lookahead(4).is_ok()); REQUIRE(p.adaptive_lookahead_enabled()); REQUIRE(p.adaptive_depth() == 4); REQUIRE(p.try_parse("ab").is_ok()); auto stats = p.adaptive_stats(); REQUIRE(stats.conflicts_seen >= stats.conflicts_decided); }
+TEST_CASE("parser adaptive lookahead disable") { auto g = make_predict_grammar(); glrpp::Parser p(g); REQUIRE(p.enable_adaptive_lookahead().is_ok()); REQUIRE(p.disable_adaptive_lookahead().is_ok()); REQUIRE_FALSE(p.adaptive_lookahead_enabled()); REQUIRE(p.try_parse("ac").is_ok()); }
+TEST_CASE("parser require atn") { auto g = make_predict_grammar(); glrpp::Parser p(g); REQUIRE(p.require_atn() != nullptr); }
+TEST_CASE("parser attach custom atn") { auto g = make_predict_grammar(); glrpp::Parser p(g); glrpp::Atn atn = glrpp::Atn::from_grammar(g); p.attach_atn(std::move(atn)); REQUIRE(p.enable_adaptive_lookahead().is_ok()); REQUIRE(p.try_parse("ac").is_ok()); }

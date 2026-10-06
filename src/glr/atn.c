@@ -11,6 +11,8 @@ struct glr_atn
   uint32_t start;
   uint32_t *rule_starts;
   size_t rule_start_count;
+  uint32_t *prod_starts;
+  size_t prod_start_count;
 };
 
 struct glr_atn_state_set
@@ -71,6 +73,7 @@ glr_atn_destroy(glr_atn_t *atn)
     free(atn->states[i].transitions);
   free(atn->states);
   free(atn->rule_starts);
+  free(atn->prod_starts);
   free(atn);
 }
 
@@ -387,6 +390,14 @@ glr_atn_from_grammar(const glr_grammar_t *grammar)
     goto fail;
   for (size_t i = 0; i < g->symbol_count; ++i)
     atn->rule_starts[i] = UINT32_MAX;
+  atn->prod_start_count = g->production_count;
+  if (g->production_count > SIZE_MAX / sizeof(*atn->prod_starts))
+    goto fail;
+  atn->prod_starts = malloc(g->production_count * sizeof(*atn->prod_starts));
+  if (g->production_count != 0 && atn->prod_starts == NULL)
+    goto fail;
+  for (size_t i = 0; i < g->production_count; ++i)
+    atn->prod_starts[i] = UINT32_MAX;
 
   for (size_t s = 0; s < g->symbol_count; ++s)
     {
@@ -409,6 +420,10 @@ glr_atn_from_grammar(const glr_grammar_t *grammar)
           from = glr_atn_add_state(atn);
           if (from == UINT32_MAX || glr_atn_add_epsilon(atn, rule_start, from) != 0)
             goto fail;
+          if (prod->id >= 0
+              && (size_t)prod->id < atn->prod_start_count
+              && atn->prod_starts[prod->id] == UINT32_MAX)
+            atn->prod_starts[prod->id] = from;
           for (size_t b = 0; b < prod->body_length; ++b)
             {
               uint32_t to = glr_atn_add_state(atn);
@@ -434,4 +449,13 @@ glr_atn_rule_start(const glr_atn_t *atn, int nonterminal_id)
       || (size_t)nonterminal_id >= atn->rule_start_count)
     return UINT32_MAX;
   return atn->rule_starts[nonterminal_id];
+}
+
+uint32_t
+glr_atn_production_start(const glr_atn_t *atn, int production_id)
+{
+  if (atn == NULL || production_id < 0
+      || (size_t)production_id >= atn->prod_start_count)
+    return UINT32_MAX;
+  return atn->prod_starts[production_id];
 }

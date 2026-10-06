@@ -67,6 +67,15 @@ typedef struct
   size_t furthest;
   bool reader;
   bool scannerless;
+  bool adaptive;
+  size_t max_depth;
+  glr_atn_t *atn;
+  glr_atn_follow_t *follow;
+  size_t window_key;
+  bool window_valid;
+  int *window_ahead;
+  size_t window_ahead_count;
+  bool window_deterministic;
 } parse_run_t;
 
 static char *
@@ -102,29 +111,41 @@ active_table (glr_parser_t *parser)
   return parser->parse_table != NULL ? parser->parse_table : parser->grammar->parse_table;
 }
 
+static uint32_t top_state (const glr_stack_t *stack);
+
+static uint64_t
+grammar_fingerprint (const glr_grammar_t *grammar)
+{
+  uint64_t fingerprint = UINT64_C (14695981039346656037);
+  fingerprint = (fingerprint ^ grammar->symbol_count)
+                * UINT64_C (1099511628211);
+  fingerprint = (fingerprint ^ (uint32_t) grammar->start_symbol->id)
+                * UINT64_C (1099511628211);
+  for (size_t i = 0; i < grammar->production_count; i++)
+    {
+      const glr_production_t *production = grammar->productions[i];
+      fingerprint = (fingerprint ^ (uint32_t) production->head->id)
+                    * UINT64_C (1099511628211);
+      fingerprint = (fingerprint ^ production->body_length)
+                    * UINT64_C (1099511628211);
+      for (size_t c = 0; c < production->body_length; c++)
+        fingerprint = (fingerprint ^ (uint32_t) production->body[c]->id)
+                      * UINT64_C (1099511628211);
+    }
+  return fingerprint;
+}
+
 static int
 initialize_table (glr_parser_t *parser)
 {
   glr_parse_table_t *table = active_table (parser);
-  uint64_t fingerprint = UINT64_C (14695981039346656037);
+  uint64_t fingerprint;
   if (!glr_grammar_validate (parser->grammar, NULL, 0))
     {
       parser->error = GLR_PARSE_ERROR_GRAMMAR;
       return -1;
     }
-  fingerprint = (fingerprint ^ parser->grammar->symbol_count) * UINT64_C (1099511628211);
-  fingerprint = (fingerprint ^ (uint32_t) parser->grammar->start_symbol->id)
-                * UINT64_C (1099511628211);
-  for (size_t i = 0; i < parser->grammar->production_count; i++)
-    {
-      const glr_production_t *production = parser->grammar->productions[i];
-      fingerprint = (fingerprint ^ (uint32_t) production->head->id)
-                    * UINT64_C (1099511628211);
-      fingerprint = (fingerprint ^ production->body_length) * UINT64_C (1099511628211);
-      for (size_t c = 0; c < production->body_length; c++)
-        fingerprint = (fingerprint ^ (uint32_t) production->body[c]->id)
-                      * UINT64_C (1099511628211);
-    }
+  fingerprint = grammar_fingerprint (parser->grammar);
   if (parser->generated_parse_table && parser->grammar_fingerprint != fingerprint)
     {
       glr_parse_table_destroy (parser->parse_table);
@@ -150,6 +171,141 @@ initialize_table (glr_parser_t *parser)
   return 0;
 }
 
+/* Ensure the ATN and FOLLOW summary used by adaptive lookahead.  The
+   grammar is already validated by initialize_table().  A custom ATN is
+   reused as-is; an automatically built one is refreshed together with the
+   FOLLOW summary whenever the grammar fingerprint changed. */
+static int
+ensure_adaptive (parse_run_t *run)
+{
+  glr_parser_t *parser = run->parser;
+  uint64_t fingerprint = grammar_fingerprint (parser->grammar);
+  if (parser->atn_follow == NULL
+      || parser->atn_follow_fingerprint != fingerprint)
+    {
+      glr_atn_follow_t *follow = glr_atn_follow_compute (parser->grammar);
+      if (follow == NULL)
+        {
+          parser->error = GLR_PARSE_ERROR_MEMORY;
+          return -1;
+        }
+      glr_atn_follow_destroy (parser->atn_follow);
+      parser->atn_follow = follow;
+      parser->atn_follow_fingerprint = fingerprint;
+      if (parser->atn_auto)
+        {
+          if (parser->owns_atn)
+            glr_atn_destroy (parser->atn);
+          parser->atn = NULL;
+          parser->owns_atn = false;
+        }
+    }
+  if (parser->atn == NULL)
+    {
+      parser->atn = glr_atn_from_grammar (parser->grammar);
+      if (parser->atn == NULL)
+        {
+          parser->error = GLR_PARSE_ERROR_MEMORY;
+          return -1;
+        }
+      parser->owns_atn = true;
+      parser->atn_auto = true;
+    }
+  run->atn = parser->atn;
+  run->follow = parser->atn_follow;
+  return 0;
+}
+
+/* Narrow one conflict cell with the ATN lookahead filter.  On success
+   *decided reports whether exactly one action survived (with its index in
+   *index); an empty survivor set keeps every action.  Counters are updated
+   for every visited conflict cell. */
+static int
+adaptive_filter_task (parse_run_t *run, const parse_task_t *task,
+                      const glr_action_set_t *actions, bool *decided,
+                      size_t *index)
+{
+  glr_parser_t *parser = run->parser;
+  int window[GLR_ATN_LOOKAHEAD_MAX_DEPTH];
+  size_t depth = run->max_depth;
+  size_t window_count = 1;
+  bool deterministic = false;
+  bool *keep;
+  size_t survivors = 0;
+  size_t survivor = 0;
+  if (depth == 0)
+    depth = GLR_ATN_LOOKAHEAD_DEFAULT_DEPTH;
+  if (depth > GLR_ATN_LOOKAHEAD_MAX_DEPTH)
+    depth = GLR_ATN_LOOKAHEAD_MAX_DEPTH;
+  window[0] = task->terminal;
+  if (!run->reader && depth > 1)
+    {
+      size_t key = task->position + task->length;
+      size_t ahead = 0;
+      if (run->window_valid && run->window_key == key)
+        {
+          ahead = run->window_ahead_count;
+          deterministic = run->window_deterministic;
+        }
+      else
+        {
+          if (glr_atn_scan_window (parser->grammar, parser->input,
+                                   parser->input_length, parser->trivia, key,
+                                   run->window_ahead, depth - 1, &ahead,
+                                   &deterministic)
+              != 0)
+            {
+              parser->error = GLR_PARSE_ERROR_MEMORY;
+              return -1;
+            }
+          run->window_key = key;
+          run->window_valid = true;
+          run->window_ahead_count = ahead;
+          run->window_deterministic = deterministic;
+        }
+      for (size_t i = 0; i < ahead && window_count < depth; ++i)
+        window[window_count++] = run->window_ahead[i];
+    }
+  keep = malloc (actions->action_count * sizeof (*keep));
+  if (keep == NULL)
+    {
+      parser->error = GLR_PARSE_ERROR_MEMORY;
+      return -1;
+    }
+  if (glr_atn_lookahead_filter (parser->grammar, run->follow, run->table,
+                                top_state (task->stack), actions, window,
+                                window_count, deterministic, keep)
+      != 0)
+    {
+      free (keep);
+      parser->error = GLR_PARSE_ERROR_MEMORY;
+      return -1;
+    }
+  for (size_t i = 0; i < actions->action_count; ++i)
+    if (keep[i])
+      {
+        ++survivors;
+        survivor = i;
+      }
+  parser->atn_conflicts_seen++;
+  if (survivors == 1)
+    {
+      *decided = true;
+      *index = survivor;
+      parser->atn_conflicts_decided++;
+      parser->atn_actions_pruned += actions->action_count - 1;
+    }
+  else
+    {
+      *decided = false;
+      *index = 0;
+      if (survivors != 0)
+        parser->atn_actions_pruned += actions->action_count - survivors;
+    }
+  free (keep);
+  return 0;
+}
+
 glr_parser_t *
 glr_parser_create (glr_grammar_t *grammar)
 {
@@ -167,6 +323,7 @@ glr_parser_create (glr_grammar_t *grammar)
       glr_parser_destroy (parser);
       return NULL;
     }
+  parser->atn_max_depth = GLR_ATN_LOOKAHEAD_DEFAULT_DEPTH;
   return parser;
 }
 
@@ -191,6 +348,9 @@ glr_parser_destroy (glr_parser_t *parser)
   glr_forest_destroy (parser->forest);
   if (parser->owns_parse_table)
     glr_parse_table_destroy (parser->parse_table);
+  if (parser->owns_atn)
+    glr_atn_destroy (parser->atn);
+  glr_atn_follow_destroy (parser->atn_follow);
   glr_reader_token_clear (&parser->lookahead);
   glr_reader_token_clear (&parser->last_token);
   glr_reader_destroy (parser->reader);
@@ -652,11 +812,29 @@ run_parser (glr_parser_t *parser, const glr_stack_t *seed, size_t position)
   run.reader = !run.scannerless && is_utf16 (parser->input, parser->input_length);
   run.cached_position = SIZE_MAX;
   run.furthest = position;
+  run.adaptive = parser->adaptive_lookahead;
+  run.max_depth = parser->atn_max_depth != 0 ? parser->atn_max_depth
+                                             : GLR_ATN_LOOKAHEAD_DEFAULT_DEPTH;
+  run.window_valid = false;
+  run.window_ahead = NULL;
+  run.window_ahead_count = 0;
+  run.window_deterministic = false;
   run.pending = vec_parse_task_ptr_t_init ();
   run.completed = vec_parse_task_ptr_t_init ();
   run.seen = kh_init (glr_configurations);
   if (run.seen == NULL)
     goto memory;
+  if (run.adaptive)
+    {
+      if (ensure_adaptive (&run) != 0)
+        goto cleanup;
+      if (!run.reader && run.max_depth > 1)
+        {
+          run.window_ahead = malloc ((run.max_depth - 1) * sizeof (int));
+          if (run.window_ahead == NULL)
+            goto memory;
+        }
+    }
   if (run.reader)
     {
       glr_reader_set_encoding (parser->reader, GLR_READER_ENCODING_UTF16_AUTO);
@@ -717,9 +895,24 @@ run_parser (glr_parser_t *parser, const glr_stack_t *seed, size_t position)
       actions = glr_parse_table_get_actions (run.table, top_state (task->stack), column);
       if (actions == NULL)
         continue;
-      chosen = choose_action (parser, task, actions);
-      if (chosen == -2)
-        goto cleanup;
+      chosen = -1;
+      {
+        bool atn_decided = false;
+        size_t atn_index = 0;
+        if (run.adaptive && actions->action_count > 1
+            && adaptive_filter_task (&run, task, actions, &atn_decided,
+                                     &atn_index)
+                   != 0)
+          goto cleanup;
+        if (!atn_decided)
+          {
+            chosen = choose_action (parser, task, actions);
+            if (chosen == -2)
+              goto cleanup;
+          }
+        else
+          chosen = (int) atn_index;
+      }
       for (size_t i = 0; i < actions->action_count; i++)
         {
           const glr_action_t *action = &actions->actions[i];
@@ -765,6 +958,7 @@ cleanup:
   vec_parse_task_ptr_t_free (&run.pending);
   vec_parse_task_ptr_t_free (&run.completed);
   free (run.matches);
+  free (run.window_ahead);
   return rc;
 }
 
@@ -956,6 +1150,77 @@ glr_parser_set_semantic_resolver (glr_parser_t *parser, glr_semantic_resolver_fn
   if (parser == NULL)
     return -1;
   parser->semantic_resolver = resolver;
+  return 0;
+}
+
+int
+glr_parser_set_adaptive_lookahead (glr_parser_t *parser, bool enabled)
+{
+  if (parser == NULL)
+    return -1;
+  parser->adaptive_lookahead = enabled;
+  return 0;
+}
+
+int
+glr_parser_set_adaptive_lookahead_depth (glr_parser_t *parser, size_t depth)
+{
+  if (parser == NULL)
+    return -1;
+  if (depth == 0)
+    depth = GLR_ATN_LOOKAHEAD_DEFAULT_DEPTH;
+  if (depth > GLR_ATN_LOOKAHEAD_MAX_DEPTH)
+    depth = GLR_ATN_LOOKAHEAD_MAX_DEPTH;
+  parser->atn_max_depth = depth;
+  return 0;
+}
+
+int
+glr_parser_set_atn (glr_parser_t *parser, glr_atn_t *atn, bool take_ownership)
+{
+  if (parser == NULL)
+    return -1;
+  if (parser->owns_atn && parser->atn != atn)
+    glr_atn_destroy (parser->atn);
+  parser->atn = atn;
+  parser->owns_atn = atn != NULL && take_ownership;
+  parser->atn_auto = false;
+  return 0;
+}
+
+glr_atn_t *
+glr_parser_require_atn (glr_parser_t *parser)
+{
+  if (parser == NULL)
+    return NULL;
+  if (!glr_grammar_validate (parser->grammar, NULL, 0))
+    {
+      parser->error = GLR_PARSE_ERROR_GRAMMAR;
+      return NULL;
+    }
+  if (parser->atn == NULL)
+    {
+      parser->atn = glr_atn_from_grammar (parser->grammar);
+      if (parser->atn == NULL)
+        {
+          parser->error = GLR_PARSE_ERROR_MEMORY;
+          return NULL;
+        }
+      parser->owns_atn = true;
+      parser->atn_auto = true;
+    }
+  return parser->atn;
+}
+
+int
+glr_parser_get_adaptive_stats (const glr_parser_t *parser,
+                               glr_parser_atn_stats_t *stats)
+{
+  if (parser == NULL || stats == NULL)
+    return -1;
+  stats->conflicts_seen = parser->atn_conflicts_seen;
+  stats->conflicts_decided = parser->atn_conflicts_decided;
+  stats->actions_pruned = parser->atn_actions_pruned;
   return 0;
 }
 

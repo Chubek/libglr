@@ -628,6 +628,8 @@ The modern façade includes:
 | `glrpp::Cache` | cache lifecycle and hashing |
 | `glrpp::Query` | query compilation and execution |
 | `glrpp::Ast` | AST ownership and S-expressions |
+| `glrpp::Atn` | ATN ownership, matching, and prediction |
+| `glrpp::Parser` adaptive controls | lookahead filter, depth, stats, ATN attach |
 | `glrpp::Graph` | graph ownership and mutation |
 
 Move-only RAII handles own C resources. `ParseTree`, forest nodes, query
@@ -701,6 +703,7 @@ parseable,” not as a process failure.
 | binary/XML serialization | `serialization.h` |
 | forest queries and ASTs | `query.h` |
 | grammar rewrites | `rewrite.h` |
+| ATN and adaptive lookahead | `atn.h` |
 | graph utilities | `graph.h` |
 | parallel application work | `thread.h` |
 | C++20 façade | `GLRpp/GLRpp.hpp` |
@@ -708,4 +711,5 @@ parseable,” not as a process failure.
 For conceptual background, read Chapters 1–4. For grammar and parser
 construction, read Chapters 5–7. For rewriting, disambiguation, serialization,
 and incremental parsing, read Chapters 8–11 and use this chapter as the modern
-API cross-reference.
+API cross-reference. For ATN simulation and adaptive lookahead, read
+Chapters 14–16.

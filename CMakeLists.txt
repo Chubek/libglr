@@ -132,6 +132,7 @@ set(GLR_SOURCES
     src/glr/stringpool.c
     src/glr/thread.c
     src/glr/atn.c
+    src/glr/atn_lookahead.c
     third_party/klib/kalloc.c
     third_party/klib/kthread.c
 )

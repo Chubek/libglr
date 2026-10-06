@@ -3,6 +3,7 @@
 
 #include <glr/forest.h>
 #include <glr/grammar.h>
+#include <glr/atn.h>
 #include <glr/lexer-hooks.h>
 #include <glr/parsetbl.h>
 #include <glr/reader.h>
@@ -139,6 +140,16 @@ extern "C"
     glr_semantic_resolver_fn semantic_resolver; ///< Resolve packed alternatives
     bool generated_parse_table;           ///< Internal generated-table marker
     uint64_t grammar_fingerprint;         ///< Structure used by the generated table
+    glr_atn_t *atn;                       ///< ATN for adaptive lookahead (optional)
+    bool owns_atn;                        ///< Whether parser destroys atn
+    bool atn_auto;                        ///< Whether atn was built automatically
+    bool adaptive_lookahead;              ///< Filter conflicts via ATN lookahead
+    size_t atn_max_depth;                 ///< Lookahead window depth (>= 1)
+    glr_atn_follow_t *atn_follow;         ///< Cached FIRST/FOLLOW summary
+    uint64_t atn_follow_fingerprint;      ///< Grammar fingerprint of atn_follow
+    unsigned long long atn_conflicts_seen;    ///< Conflict cells visited
+    unsigned long long atn_conflicts_decided; ///< Conflicts narrowed to one action
+    unsigned long long atn_actions_pruned;    ///< Actions removed by the filter
   };
 
   /* ========================================================================
@@ -228,6 +239,117 @@ extern "C"
       A NULL resolver requires an unambiguous forest. */
   int glr_parser_set_semantic_resolver (glr_parser_t *parser,
                                        glr_semantic_resolver_fn resolver);
+
+  /* ========================================================================
+   * Adaptive lookahead (optional ATN pipeline)
+   * ======================================================================== */
+
+  /**
+   * @brief Enable or disable adaptive lookahead for conflict cells.
+   *
+   * When enabled, a conflict cell (more than one LR action for the current
+   * state and lookahead) is first passed through the ATN lookahead filter:
+   * REDUCE candidates outside FOLLOW(head) and SHIFT candidates with no
+   * next-state viability on the deterministically scanned second token are
+   * removed.  The filter is conservative: when it cannot narrow the cell to
+   * a single action, every action is pursued (full GLR forking) and user
+   * disambiguators still run.  The ATN is built from the grammar on demand
+   * and rebuilt when the grammar changes; a custom ATN installed with
+   * glr_parser_set_atn() is reused instead.
+   *
+   * Disabled by default.  Depth defaults to GLR_ATN_LOOKAHEAD_DEFAULT_DEPTH.
+   *
+   * @param parser Parser instance
+   * @param enabled true to filter conflicts, false for plain GLR forking
+   * @return 0 on success, -1 on invalid input
+   */
+  int glr_parser_set_adaptive_lookahead (glr_parser_t *parser, bool enabled);
+
+  /**
+   * @brief Whether adaptive lookahead is enabled (null-safe).
+   */
+  static inline bool
+  glr_parser_get_adaptive_lookahead (const glr_parser_t *parser)
+  {
+    return parser != NULL && parser->adaptive_lookahead;
+  }
+
+  /**
+   * @brief Set the adaptive lookahead window depth.
+   *
+   * Depth counts the conflict token plus following tokens (minimum 1).
+   * Values above GLR_ATN_LOOKAHEAD_MAX_DEPTH are clamped.  Zero selects the
+   * default depth.  The current depth is GLR_ATN_LOOKAHEAD_DEFAULT_DEPTH
+   * until changed.
+   *
+   * @param parser Parser instance
+   * @param depth Window depth (0 selects the default)
+   * @return 0 on success, -1 on invalid input
+   */
+  int glr_parser_set_adaptive_lookahead_depth (glr_parser_t *parser,
+                                               size_t depth);
+
+  /**
+   * @brief Get the adaptive lookahead window depth (0 for NULL parser).
+   */
+  static inline size_t
+  glr_parser_get_adaptive_lookahead_depth (const glr_parser_t *parser)
+  {
+    return parser != NULL ? parser->atn_max_depth : 0;
+  }
+
+  /**
+   * @brief Attach a custom ATN for adaptive lookahead.
+   *
+   * Passing NULL detaches (and destroys when owned) the current ATN.  An
+   * attached ATN is reused as-is and never rebuilt automatically, so it
+   * must have been compiled from the parser's grammar.
+   *
+   * @param parser Parser instance
+   * @param atn ATN to attach, or NULL to detach
+   * @param take_ownership true if the parser should destroy the ATN
+   * @return 0 on success, -1 on invalid input
+   */
+  int glr_parser_set_atn (glr_parser_t *parser, glr_atn_t *atn,
+                          bool take_ownership);
+
+  /**
+   * @brief Get the ATN currently attached to a parser, if any.
+   */
+  static inline glr_atn_t *
+  glr_parser_get_atn (const glr_parser_t *parser)
+  {
+    return parser != NULL ? parser->atn : NULL;
+  }
+
+  /**
+   * @brief Return the parser's ATN, building it from the grammar if needed.
+   *
+   * The built ATN is attached (owned) and reused afterwards.  Returns NULL
+   * on invalid input, invalid grammar, or allocation failure.
+   */
+  glr_atn_t *glr_parser_require_atn (glr_parser_t *parser);
+
+  /**
+   * @struct glr_parser_atn_stats_t
+   * @brief Counters describing adaptive-lookahead behaviour.
+   */
+  typedef struct
+  {
+    unsigned long long conflicts_seen;   ///< Conflict cells visited
+    unsigned long long conflicts_decided; ///< Cells narrowed to one action
+    unsigned long long actions_pruned;    ///< Actions removed by the filter
+  } glr_parser_atn_stats_t;
+
+  /**
+   * @brief Read adaptive-lookahead counters (null-safe outputs).
+   *
+   * @param parser Parser instance
+   * @param stats Output structure (required)
+   * @return 0 on success, -1 on invalid input
+   */
+  int glr_parser_get_adaptive_stats (const glr_parser_t *parser,
+                                     glr_parser_atn_stats_t *stats);
 
   /* ========================================================================
    * Resumable parsing

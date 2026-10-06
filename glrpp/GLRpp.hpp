@@ -20,6 +20,7 @@
 #include "rewrite/RewritePipeline.hpp"
 
 #include <glr/disambiguate.h>
+#include <glr/atn.h>
 #include <glr/cache.h>
 #include <glr/dependency.h>
 #include <glr/diff.h>
@@ -552,6 +553,83 @@ private:
   rewrite::GrammarIR rewrite_ir_;
 };
 
+class Atn
+{
+public:
+  explicit Atn (glr_atn_t *atn = nullptr) : handle_ (atn) {}
+
+  static Atn
+  from_grammar (const Grammar &grammar)
+  {
+    auto *atn = glr_atn_from_grammar (grammar.handle ());
+    if (!atn)
+      throw std::runtime_error ("glr_atn_from_grammar failed");
+    return Atn (atn);
+  }
+
+  size_t
+  state_count () const noexcept
+  {
+    return glr_atn_state_count (handle_.get ());
+  }
+  uint32_t
+  start_state () const noexcept
+  {
+    return glr_atn_start_state (handle_.get ());
+  }
+  uint32_t
+  rule_start (int nonterminal) const noexcept
+  {
+    return glr_atn_rule_start (handle_.get (), nonterminal);
+  }
+  uint32_t
+  production_start (int production) const noexcept
+  {
+    return glr_atn_production_start (handle_.get (), production);
+  }
+  int
+  match (const std::vector<int> &symbols) const noexcept
+  {
+    return glr_atn_match (handle_.get (), symbols.data (), symbols.size ());
+  }
+  long
+  viable_prefix (const std::vector<int> &symbols, uint32_t start) const noexcept
+  {
+    return glr_atn_viable_prefix_length (handle_.get (), start,
+                                         symbols.data (), symbols.size ());
+  }
+  dsl::Result<int, std::string>
+  predict (const Grammar &grammar, int nonterminal,
+           const std::vector<int> &window) const noexcept
+  {
+    int production = -1;
+    int rc = glr_atn_predict_production (handle_.get (), grammar.handle (),
+                                         nonterminal, window.data (),
+                                         window.size (), &production);
+    if (rc < 0)
+      return dsl::Result<int, std::string>::from_err (
+          "glr_atn_predict_production failed");
+    if (rc == 0)
+      return dsl::Result<int, std::string>::from_err ("lookahead undecided");
+    return dsl::Result<int, std::string>::from_ok (production);
+  }
+
+  glr_atn_t *
+  handle () const noexcept
+  {
+    return handle_.get ();
+  }
+  glr_atn_t *
+  release () noexcept
+  {
+    return handle_.release ();
+  }
+
+private:
+  using AtnHandle = detail::ResourceHandle<glr_atn_t *, &glr_atn_destroy>;
+  AtnHandle handle_;
+};
+
 class ProductionBuilder
 {
 public:
@@ -786,6 +864,60 @@ public:
     if (glr_parser_set_trivia (handle_.get (), copy.c_str ()) != 0)
       return Status::from_err ("failed to configure parser trivia");
     return Status::from_ok (true);
+  }
+
+  Status enable_adaptive_lookahead (
+      size_t depth = GLR_ATN_LOOKAHEAD_DEFAULT_DEPTH)
+  {
+    if (glr_parser_set_adaptive_lookahead_depth (handle_.get (), depth) != 0)
+      return Status::from_err ("failed to configure lookahead depth");
+    if (glr_parser_set_adaptive_lookahead (handle_.get (), true) != 0)
+      return Status::from_err ("failed to enable adaptive lookahead");
+    return Status::from_ok (true);
+  }
+
+  Status disable_adaptive_lookahead ()
+  {
+    if (glr_parser_set_adaptive_lookahead (handle_.get (), false) != 0)
+      return Status::from_err ("failed to disable adaptive lookahead");
+    return Status::from_ok (true);
+  }
+
+  bool
+  adaptive_lookahead_enabled () const noexcept
+  {
+    return glr_parser_get_adaptive_lookahead (handle_.get ());
+  }
+  size_t
+  adaptive_depth () const noexcept
+  {
+    return glr_parser_get_adaptive_lookahead_depth (handle_.get ());
+  }
+  glr_parser_atn_stats_t
+  adaptive_stats () const
+  {
+    glr_parser_atn_stats_t stats{};
+    if (glr_parser_get_adaptive_stats (handle_.get (), &stats) != 0)
+      throw std::runtime_error ("glr_parser_get_adaptive_stats failed");
+    return stats;
+  }
+  void
+  attach_atn (Atn atn)
+  {
+    auto *raw = atn.release ();
+    if (glr_parser_set_atn (handle_.get (), raw, true) != 0)
+      {
+        glr_atn_destroy (raw);
+        throw std::runtime_error ("glr_parser_set_atn failed");
+      }
+  }
+  glr_atn_t *
+  require_atn ()
+  {
+    auto *atn = glr_parser_require_atn (handle_.get ());
+    if (!atn)
+      throw std::runtime_error ("glr_parser_require_atn failed");
+    return atn;
   }
 
   glr_parse_error_t error () const noexcept
