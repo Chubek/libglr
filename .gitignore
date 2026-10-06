@@ -212,6 +212,10 @@ Testing/
 ############################
 .gitignore.local
 
+# Moosedog keeps its CLI sources under moosedog/bin/ despite the broad
+# build-output bin/ rule above.
+!moosedog/bin/
+
 # Bindings
 _bindings_
 

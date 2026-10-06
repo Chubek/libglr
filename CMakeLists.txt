@@ -15,6 +15,7 @@ option(EMBED_MD_DOCS "Embed and install markdown documentation" ON)
 option(BUILD_DISAMBSTD "Build the standard disambiguation library" ON)
 option(BUILD_REWRITELIB "Install the standard rewrite library" ON)
 option(BUILD_SWIG_BINDINGS "Build SWIG bindings when SWIG is available" OFF)
+option(BUILD_MOOSEDOG "Build the Moosedog parser-generator frontend" ON)
 option(ENABLE_TEST_SANITIZERS "Enable address/undefined sanitizers for tests" OFF)
 option(BUILD_SHAREDLIB "Build libglr as a shared library" OFF)
 option(INSTALL_LOCAL "Install libglr into ~/.local instead of /usr/local" OFF)
@@ -317,7 +318,7 @@ if(BUILD_DOCUMENTATION)
 endif()
 
 if(INSTALL_GLRpp)
-   add_subdirectory(GLRpp)
+   add_subdirectory(glrpp)
 endif()
 
 if(EMBED_MD_DOCS)
@@ -358,6 +359,10 @@ endif()
 
 if(BUILD_SWIG_BINDINGS)
     add_subdirectory(bindings)
+endif()
+
+if(BUILD_MOOSEDOG)
+    add_subdirectory(moosedog)
 endif()
 
 # Generate package config file

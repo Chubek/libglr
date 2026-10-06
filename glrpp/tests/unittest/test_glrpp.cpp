@@ -1,10 +1,10 @@
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch_test_macros.hpp>
 
-#include "../../../GLRpp/GLRpp.hpp"
-#include "../../../GLRpp/rewrite/equinox/EquinoxPasses.hpp"
-#include "../../../GLRpp/rewrite/native/NativePasses.hpp"
-#include "../../../GLRpp/rewrite/syntax/SyntaxDSL.hpp"
+#include "../../GLRpp.hpp"
+#include "../../rewrite/equinox/EquinoxPasses.hpp"
+#include "../../rewrite/native/NativePasses.hpp"
+#include "../../rewrite/syntax/SyntaxDSL.hpp"
 
 #include <string>
 #include <vector>
