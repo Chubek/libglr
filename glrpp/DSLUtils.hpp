@@ -2020,6 +2020,22 @@ public:
       throw std::runtime_error ("dsl::Result::unwrap called on Err");
     return std::get<T> (data_);
   }
+  /// Returns error or throws if Ok.
+  E
+  unwrap_err () const
+  {
+    if (!is_err ())
+      throw std::runtime_error ("dsl::Result::unwrap_err called on Ok");
+    return std::get<E> (data_);
+  }
+  /// Moves the value out or throws if Err (for move-only payloads).
+  T
+  unwrap_move ()
+  {
+    if (!is_ok ())
+      throw std::runtime_error ("dsl::Result::unwrap_move called on Err");
+    return std::move (std::get<T> (data_));
+  }
   /// Returns value or fallback when Err.
   T
   unwrap_or (T fallback) const
